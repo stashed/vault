@@ -1,15 +1,13 @@
 package v1beta1
 
 const (
-	VersionTag = BackupKey + "/tag"
 	// ResourceVersion will be used to trigger restarts for ReplicaSet and RC pods
-	StashKey  = "stash.appscode.com"
-	BackupKey = "backup.appscode.com"
+	StashKey = "stash.appscode.com"
 
-	KeyBackupConfigurationTemplate = StashKey + "/backup-template"
-	KeyTargetDirectories           = StashKey + "/target-directories"
-	KeyMountPath                   = StashKey + "/mountpath"
-	KeyVolumeMounts                = StashKey + "/volume-mounts"
+	KeyBackupBlueprint = StashKey + "/backup-blueprint"
+	KeyTargetPaths     = StashKey + "/target-paths"
+	KeyMountPath       = StashKey + "/mountpath"
+	KeyVolumeMounts    = StashKey + "/volume-mounts"
 
 	KeyLastAppliedRestoreSession      = StashKey + "/last-applied-restoresession"
 	KeyLastAppliedBackupConfiguration = StashKey + "/last-applied-backupconfiguration"

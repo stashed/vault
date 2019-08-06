@@ -19,6 +19,7 @@ import (
 	store "kmodules.xyz/objectstore-api/api/v1"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
 	oc_cs "kmodules.xyz/openshift/client/clientset/versioned"
+	wapi "kmodules.xyz/webhook-runtime/apis/workload/v1"
 	"stash.appscode.dev/stash/apis"
 	api_v1beta1 "stash.appscode.dev/stash/apis/stash/v1beta1"
 	cs "stash.appscode.dev/stash/client/clientset/versioned"
@@ -41,12 +42,15 @@ type RepoLabelData struct {
 	NodeName     string
 }
 
+// GetHostName returns hostname for a target
 func GetHostName(target interface{}) (string, error) {
 	// target nil for cluster backup
 	var targetRef api_v1beta1.TargetRef
 	if target == nil {
 		return "host-0", nil
 	}
+
+	// read targetRef field from BackupTarget or RestoreTarget
 	switch target.(type) {
 	case *api_v1beta1.BackupTarget:
 		t := target.(*api_v1beta1.BackupTarget)
@@ -59,22 +63,38 @@ func GetHostName(target interface{}) (string, error) {
 		if t == nil {
 			return "host-0", nil
 		}
+
+		// if replicas or volumeClaimTemplate is specified then  restore is done via job.
+		// in this case, we need to know the ordinal to use as host suffix.
+		// stash operator sets desired ordinal as 'POD_ORDINAL' env while creating the job.
+		if t.Replicas != nil || len(t.VolumeClaimTemplates) != 0 {
+			if os.Getenv(KeyPodOrdinal) != "" {
+				return "host-" + os.Getenv(KeyPodOrdinal), nil
+			}
+			return "", fmt.Errorf("'target.replicas' or 'target.volumeClaimTemplate' has been specified in RestoreSession" +
+				" but 'POD_ORDINAL' env not found")
+		}
 		targetRef = t.Ref
 	}
 
+	// backup/restore is running through sidecar/init-container. identify hostname for them.
 	switch targetRef.Kind {
 	case apis.KindStatefulSet:
-		podName := os.Getenv("POD_NAME")
+		// for StatefulSet, host name is 'host-<pod ordinal>'. stash operator set pod's name as 'POD_NAME' env
+		// in the sidecar/init-container through downward api. we have to parse the pod name to get ordinal.
+		podName := os.Getenv(KeyPodName)
 		if podName == "" {
-			return "", fmt.Errorf("missing podName for %s", apis.KindStatefulSet)
+			return "", fmt.Errorf("missing 'POD_NAME' env in StatefulSet: %s", apis.KindStatefulSet)
 		}
 		podInfo := strings.Split(podName, "-")
 		podOrdinal := podInfo[len(podInfo)-1]
 		return "host-" + podOrdinal, nil
 	case apis.KindDaemonSet:
-		nodeName := os.Getenv("NODE_NAME")
+		// for DaemonSet, host name is the node name. stash operator set the respective node name as 'NODE_NAME' env
+		// in the sidecar/init-container through downward api.
+		nodeName := os.Getenv(KeyNodeName)
 		if nodeName == "" {
-			return "", fmt.Errorf("missing nodeName for %s", apis.KindDaemonSet)
+			return "", fmt.Errorf("missing 'NODE_NAME' env for DaemonSet: %s", apis.KindDaemonSet)
 		}
 		return nodeName, nil
 	default:
@@ -199,9 +219,9 @@ func GetMaxConnections(backend store.Backend) int {
 	if backend.GCS != nil {
 		return backend.GCS.MaxConnections
 	} else if backend.Azure != nil {
-		return backend.GCS.MaxConnections
+		return backend.Azure.MaxConnections
 	} else if backend.B2 != nil {
-		return backend.GCS.MaxConnections
+		return backend.B2.MaxConnections
 	}
 	return 0
 }
@@ -238,6 +258,17 @@ func AttachLocalBackend(podSpec core.PodSpec, localSpec store.LocalSpec) core.Po
 	}
 	for i := range podSpec.Containers {
 		podSpec.Containers[i].VolumeMounts = core_util.UpsertVolumeMount(podSpec.Containers[i].VolumeMounts, mount)
+	}
+	return podSpec
+}
+
+func AttachPVC(podSpec core.PodSpec, volumes []core.Volume, volumeMounts []core.VolumeMount) core.PodSpec {
+	podSpec.Volumes = core_util.UpsertVolume(podSpec.Volumes, volumes...)
+	for i := range podSpec.InitContainers {
+		podSpec.InitContainers[i].VolumeMounts = core_util.UpsertVolumeMount(podSpec.InitContainers[i].VolumeMounts, volumeMounts...)
+	}
+	for i := range podSpec.Containers {
+		podSpec.Containers[i].VolumeMounts = core_util.UpsertVolumeMount(podSpec.Containers[i].VolumeMounts, volumeMounts...)
 	}
 	return podSpec
 }
@@ -330,6 +361,59 @@ func (wc *WorkloadClients) IsTargetExist(target api_v1beta1.TargetRef, namespace
 		}
 	case apis.KindAppBinding:
 		if _, err := wc.AppCatalogClient.AppcatalogV1alpha1().AppBindings(namespace).Get(target.Name, metav1.GetOptions{}); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// CreateBatchPVC creates a batch of PVCs whose definitions has been provided in pvcList argument
+func CreateBatchPVC(kubeClient kubernetes.Interface, namespace string, pvcList []core.PersistentVolumeClaim) error {
+	for _, pvc := range pvcList {
+		_, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).Create(&pvc)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// PVCListToVolumes return a list of volumes to mount in pod for a list of PVCs
+func PVCListToVolumes(pvcList []core.PersistentVolumeClaim, ordinal int32) []core.Volume {
+	volList := make([]core.Volume, 0)
+	var volName string
+	for _, pvc := range pvcList {
+		volName = strings.TrimSuffix(pvc.Name, fmt.Sprintf("-%d", ordinal))
+		volList = append(volList, core.Volume{
+			Name: volName,
+			VolumeSource: core.VolumeSource{
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+				},
+			},
+		})
+	}
+	return volList
+}
+
+func HasStashContainer(w *wapi.Workload) bool {
+	return HasStashSidecar(w.Spec.Template.Spec.Containers) || HasStashInitContainer(w.Spec.Template.Spec.InitContainers)
+}
+
+func HasStashSidecar(containers []core.Container) bool {
+	// check if the workload has stash sidecar container
+	for _, c := range containers {
+		if c.Name == StashContainer {
+			return true
+		}
+	}
+	return false
+}
+
+func HasStashInitContainer(containers []core.Container) bool {
+	// check if the workload has stash init-container
+	for _, c := range containers {
+		if c.Name == StashInitContainer {
 			return true
 		}
 	}

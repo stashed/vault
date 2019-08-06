@@ -22,25 +22,28 @@ type Command struct {
 	Args []interface{}
 }
 
-// if StdinPipeCommand is specified, BackupDirs will not be used
+// BackupOptions specifies backup information
+// if StdinPipeCommand is specified, BackupPaths will not be used
 type BackupOptions struct {
 	Host             string
-	BackupDirs       []string
+	BackupPaths      []string
 	StdinPipeCommand Command
 	StdinFileName    string // default "stdin"
 	RetentionPolicy  v1alpha1.RetentionPolicy
 }
 
+// RestoreOptions specifies restore information
 type RestoreOptions struct {
-	Host        string
-	SourceHost  string
-	RestoreDirs []string
-	Snapshots   []string // when Snapshots are specified SourceHost and RestoreDirs will not be used
-	Destination string   // destination path where snapshot will be restored, used in cli
+	Host         string
+	SourceHost   string
+	RestorePaths []string
+	Snapshots    []string // when Snapshots are specified SourceHost and RestorePaths will not be used
+	Destination  string   // destination path where snapshot will be restored, used in cli
 }
 
 type DumpOptions struct {
 	Host              string
+	SourceHost        string
 	Snapshot          string // default "latest"
 	Path              string
 	FileName          string // default "stdin"
@@ -105,4 +108,31 @@ func (w *ResticWrapper) GetRepo() string {
 		return w.sh.Env[RESTIC_REPOSITORY]
 	}
 	return ""
+}
+
+// Copy function copy input ResticWrapper and returns a new wrapper with copy of its content.
+func (w *ResticWrapper) Copy() *ResticWrapper {
+	if w == nil {
+		return nil
+	}
+	out := new(ResticWrapper)
+
+	if w.sh != nil {
+		out.sh = shell.NewSession()
+
+		// set values in.sh to out.sh
+		for k, v := range w.sh.Env {
+			out.sh.Env[k] = v
+		}
+		// don't use same stdin, stdout, stderr for each instant to avoid data race.
+		//out.sh.Stdin = in.sh.Stdin
+		//out.sh.Stdout = in.sh.Stdout
+		//out.sh.Stderr = in.sh.Stderr
+		out.sh.ShowCMD = w.sh.ShowCMD
+		out.sh.PipeFail = w.sh.PipeFail
+		out.sh.PipeStdErrors = w.sh.PipeStdErrors
+
+	}
+	out.config = w.config
+	return out
 }

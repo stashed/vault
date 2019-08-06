@@ -1,19 +1,23 @@
 # cloud.google.com/go v0.39.0
 cloud.google.com/go/compute/metadata
-# contrib.go.opencensus.io/exporter/ocagent v0.5.0
+# contrib.go.opencensus.io/exporter/ocagent v0.4.12 => contrib.go.opencensus.io/exporter/ocagent v0.3.0
 contrib.go.opencensus.io/exporter/ocagent
-# github.com/Azure/go-autorest v12.0.0+incompatible
+# github.com/Azure/go-autorest/autorest v0.5.0
 github.com/Azure/go-autorest/autorest
-github.com/Azure/go-autorest/autorest/adal
 github.com/Azure/go-autorest/autorest/azure
-github.com/Azure/go-autorest/logger
-github.com/Azure/go-autorest/tracing
+# github.com/Azure/go-autorest/autorest/adal v0.2.0
+github.com/Azure/go-autorest/autorest/adal
+# github.com/Azure/go-autorest/autorest/date v0.1.0
 github.com/Azure/go-autorest/autorest/date
+# github.com/Azure/go-autorest/logger v0.1.0
+github.com/Azure/go-autorest/logger
+# github.com/Azure/go-autorest/tracing v0.2.0
+github.com/Azure/go-autorest/tracing
 # github.com/PuerkitoBio/purell v1.1.1
 github.com/PuerkitoBio/purell
 # github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 github.com/PuerkitoBio/urlesc
-# github.com/appscode/go v0.0.0-20190523031839-1468ee3a76e8
+# github.com/appscode/go v0.0.0-20190722173419-e454bf744023
 github.com/appscode/go/log
 github.com/appscode/go/version
 github.com/appscode/go/flags
@@ -26,19 +30,15 @@ github.com/appscode/go/encoding/json/types
 github.com/appscode/go/analytics
 github.com/appscode/go/net
 github.com/appscode/go/homedir
-# github.com/appscode/jsonpatch v0.0.0-20190108182946-7c0e3b262f30
-github.com/appscode/jsonpatch
 # github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 github.com/armon/circbuf
 # github.com/beorn7/perks v1.0.0
 github.com/beorn7/perks/quantile
-# github.com/census-instrumentation/opencensus-proto v0.2.0
+# github.com/census-instrumentation/opencensus-proto v0.2.0 => github.com/census-instrumentation/opencensus-proto v0.1.0
 github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1
-github.com/census-instrumentation/opencensus-proto/gen-go/agent/metrics/v1
 github.com/census-instrumentation/opencensus-proto/gen-go/agent/trace/v1
-github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1
-github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1
 github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1
+github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1
 # github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0
 github.com/codegangsta/inject
 # github.com/codeskyblue/go-sh v0.0.0-20190412065543-76bd3d59ff27
@@ -50,7 +50,7 @@ github.com/dgrijalva/jwt-go
 # github.com/emicklei/go-restful v2.9.5+incompatible
 github.com/emicklei/go-restful
 github.com/emicklei/go-restful/log
-# github.com/evanphx/json-patch v4.2.0+incompatible
+# github.com/evanphx/json-patch v4.5.0+incompatible
 github.com/evanphx/json-patch
 # github.com/fatih/structs v1.1.0
 github.com/fatih/structs
@@ -69,7 +69,7 @@ github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
 # github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 github.com/golang/glog
-# github.com/golang/protobuf v1.3.1
+# github.com/golang/protobuf v1.3.1 => github.com/golang/protobuf v1.2.0
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes/struct
@@ -78,11 +78,7 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/wrappers
-github.com/golang/protobuf/protoc-gen-go/generator
-github.com/golang/protobuf/protoc-gen-go/descriptor
-github.com/golang/protobuf/protoc-gen-go/generator/internal/remap
-github.com/golang/protobuf/protoc-gen-go/plugin
-# github.com/google/btree v1.0.0
+# github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c
 github.com/google/btree
 # github.com/google/go-cmp v0.3.0
 github.com/google/go-cmp/cmp
@@ -109,10 +105,6 @@ github.com/gophercloud/gophercloud/pagination
 # github.com/gregjones/httpcache v0.0.0-20190212212710-3befbb6ad0cc
 github.com/gregjones/httpcache
 github.com/gregjones/httpcache/diskcache
-# github.com/grpc-ecosystem/grpc-gateway v1.8.6
-github.com/grpc-ecosystem/grpc-gateway/runtime
-github.com/grpc-ecosystem/grpc-gateway/utilities
-github.com/grpc-ecosystem/grpc-gateway/internal
 # github.com/hashicorp/golang-lru v0.5.1
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
@@ -145,7 +137,7 @@ github.com/modern-go/reflect2
 github.com/peterbourgon/diskv
 # github.com/pkg/errors v0.8.1
 github.com/pkg/errors
-# github.com/prometheus/client_golang v0.9.3
+# github.com/prometheus/client_golang v0.9.4
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/push
 github.com/prometheus/client_golang/prometheus/internal
@@ -155,12 +147,14 @@ github.com/prometheus/client_model/go
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/model
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
-# github.com/prometheus/procfs v0.0.0-20190523193104-a7aeb8df3389
+# github.com/prometheus/procfs v0.0.2
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
+# github.com/robfig/cron/v3 v3.0.0
+github.com/robfig/cron/v3
 # github.com/sergi/go-diff v1.0.0
 github.com/sergi/go-diff/diffmatchpatch
-# github.com/spf13/cobra v0.0.4
+# github.com/spf13/cobra v0.0.5
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.3
 github.com/spf13/pflag
@@ -169,18 +163,16 @@ github.com/yudai/gojsondiff
 github.com/yudai/gojsondiff/formatter
 # github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82
 github.com/yudai/golcs
-# go.opencensus.io v0.21.0
+# go.opencensus.io v0.21.0 => go.opencensus.io v0.21.0
 go.opencensus.io/plugin/ochttp
 go.opencensus.io/plugin/ochttp/propagation/tracecontext
 go.opencensus.io/stats/view
 go.opencensus.io/trace
 go.opencensus.io
-go.opencensus.io/plugin/ocgrpc
-go.opencensus.io/resource
-go.opencensus.io/stats
-go.opencensus.io/tag
 go.opencensus.io/trace/tracestate
 go.opencensus.io/plugin/ochttp/propagation/b3
+go.opencensus.io/stats
+go.opencensus.io/tag
 go.opencensus.io/trace/propagation
 go.opencensus.io/internal/tagencoding
 go.opencensus.io/metric/metricdata
@@ -188,9 +180,10 @@ go.opencensus.io/metric/metricproducer
 go.opencensus.io/stats/internal
 go.opencensus.io/internal
 go.opencensus.io/trace/internal
-# golang.org/x/crypto v0.0.0-20190513172903-22d7a77e9e5f
+go.opencensus.io/resource
+# golang.org/x/crypto v0.0.0-20190506204251-e1dfcc566284
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20190522155817-f3200d17e092
+# golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 golang.org/x/net/http2
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2/hpack
@@ -199,7 +192,7 @@ golang.org/x/net/context/ctxhttp
 golang.org/x/net/context
 golang.org/x/net/trace
 golang.org/x/net/internal/timeseries
-# golang.org/x/oauth2 v0.0.0-20190523182746-aaccbc9213b0
+# golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 golang.org/x/oauth2
 golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
@@ -207,7 +200,7 @@ golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190423024810-112230192c58
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20190523142557-0e01d883c5c5
+# golang.org/x/sys v0.0.0-20190508100423-12bbe5a7a520
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.2
@@ -224,9 +217,11 @@ golang.org/x/text/internal/utf8internal
 golang.org/x/text/runes
 # golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 golang.org/x/time/rate
-# google.golang.org/api v0.5.0
+# gomodules.xyz/jsonpatch/v2 v2.0.0
+gomodules.xyz/jsonpatch/v2
+# google.golang.org/api v0.7.0
 google.golang.org/api/support/bundler
-# google.golang.org/appengine v1.6.0
+# google.golang.org/appengine v1.5.0
 google.golang.org/appengine
 google.golang.org/appengine/urlfetch
 google.golang.org/appengine/internal
@@ -238,22 +233,17 @@ google.golang.org/appengine/internal/datastore
 google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 # google.golang.org/genproto v0.0.0-20190508193815-b515fa19cec8
-google.golang.org/genproto/googleapis/api/httpbody
-google.golang.org/genproto/protobuf/field_mask
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.20.1
 google.golang.org/grpc
-google.golang.org/grpc/credentials
-google.golang.org/grpc/metadata
-google.golang.org/grpc/codes
-google.golang.org/grpc/grpclog
-google.golang.org/grpc/status
-google.golang.org/grpc/stats
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/roundrobin
+google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
+google.golang.org/grpc/credentials
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/proto
+google.golang.org/grpc/grpclog
 google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff
 google.golang.org/grpc/internal/balancerload
@@ -264,20 +254,21 @@ google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/keepalive
+google.golang.org/grpc/metadata
 google.golang.org/grpc/naming
 google.golang.org/grpc/peer
 google.golang.org/grpc/resolver
 google.golang.org/grpc/resolver/dns
 google.golang.org/grpc/resolver/passthrough
+google.golang.org/grpc/stats
+google.golang.org/grpc/status
 google.golang.org/grpc/tap
-google.golang.org/grpc/credentials/internal
 google.golang.org/grpc/balancer/base
+google.golang.org/grpc/credentials/internal
 google.golang.org/grpc/binarylog/grpc_binarylog_v1
 google.golang.org/grpc/internal/syscall
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
-# gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5 => github.com/appscode/cron v0.0.0-20170717094345-ca60c6d796d4
-gopkg.in/robfig/cron.v2
 # gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2
 # k8s.io/api v0.0.0-20190515023547-db5a9d1c40eb => k8s.io/api v0.0.0-20190313235455-40a48860b5ab
@@ -317,7 +308,7 @@ k8s.io/api/settings/v1alpha1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apiextensions-apiserver v0.0.0-20190515024537-2fd0e9006049 => k8s.io/apiextensions-apiserver v0.0.0-20190315093550-53c4693659ed
+# k8s.io/apiextensions-apiserver v0.0.0-20190516231611-bf6753f2aa24 => k8s.io/apiextensions-apiserver v0.0.0-20190315093550-53c4693659ed
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
@@ -369,7 +360,7 @@ k8s.io/apimachinery/pkg/apis/meta/internalversion
 k8s.io/apimachinery/pkg/api/validation
 k8s.io/apimachinery/pkg/apis/meta/v1/validation
 k8s.io/apimachinery/pkg/api/equality
-# k8s.io/cli-runtime v0.0.0-20190515024640-178667528169 => k8s.io/cli-runtime v0.0.0-20190314001948-2899ed30580f
+# k8s.io/cli-runtime v0.0.0-20190516231937-17bc0b7fcef5 => k8s.io/cli-runtime v0.0.0-20190314001948-2899ed30580f
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/printers
 k8s.io/cli-runtime/pkg/resource
@@ -493,18 +484,18 @@ k8s.io/client-go/util/connrotation
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/tools/pager
 k8s.io/client-go/util/retry
-# k8s.io/klog v0.3.1 => k8s.io/klog v0.3.0
+# k8s.io/klog v0.3.0 => k8s.io/klog v0.3.0
 k8s.io/klog
 # k8s.io/kube-openapi v0.0.0-20190510232812-a01b7d5d6c22 => k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/util/proto
-# k8s.io/kubernetes v1.14.2 => k8s.io/kubernetes v1.14.0
+# k8s.io/kubernetes v1.14.0 => k8s.io/kubernetes v1.14.0
 k8s.io/kubernetes/pkg/util/hash
 # k8s.io/utils v0.0.0-20190520173318-324c5df7d3f0 => k8s.io/utils v0.0.0-20190221042446-c2654d5206da
 k8s.io/utils/integer
 k8s.io/utils/buffer
 k8s.io/utils/trace
-# kmodules.xyz/client-go v0.0.0-20190518160232-4afdbc13ba68
+# kmodules.xyz/client-go v0.0.0-20190802200916-043217632b6a
 kmodules.xyz/client-go/logs
 kmodules.xyz/client-go/tools/cli
 kmodules.xyz/client-go/tools/analytics
@@ -513,24 +504,25 @@ kmodules.xyz/client-go/meta
 kmodules.xyz/client-go/tools/clientcmd
 kmodules.xyz/client-go/apiextensions/v1beta1
 kmodules.xyz/client-go
-# kmodules.xyz/custom-resources v0.0.0-20190508103408-464e8324c3ec
+# kmodules.xyz/custom-resources v0.0.0-20190802202832-aaad432d3364
 kmodules.xyz/custom-resources/client/clientset/versioned
 kmodules.xyz/custom-resources/client/clientset/versioned/typed/appcatalog/v1alpha1
 kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1
 kmodules.xyz/custom-resources/client/clientset/versioned/scheme
 kmodules.xyz/custom-resources/apis/appcatalog
-# kmodules.xyz/objectstore-api v0.0.0-20190516233206-ea3ba546e348
+# kmodules.xyz/objectstore-api v0.0.0-20190802205146-9816ffafe0d7
 kmodules.xyz/objectstore-api/api/v1
-# kmodules.xyz/offshoot-api v0.0.0-20190513045534-4f3df05f40c2
+# kmodules.xyz/offshoot-api v0.0.0-20190802203449-05938be4a23b
 kmodules.xyz/offshoot-api/api/v1
-# kmodules.xyz/openshift v0.0.0-20190508141315-99ec9fc946bf
+kmodules.xyz/offshoot-api/util
+# kmodules.xyz/openshift v0.0.0-20190802201709-f05cf11ae73e
 kmodules.xyz/openshift/client/clientset/versioned
 kmodules.xyz/openshift/client/clientset/versioned/typed/apps/v1
 kmodules.xyz/openshift/client/clientset/versioned/typed/security/v1
 kmodules.xyz/openshift/apis/apps/v1
 kmodules.xyz/openshift/client/clientset/versioned/scheme
 kmodules.xyz/openshift/apis/security/v1
-# kmodules.xyz/webhook-runtime v0.0.0-20190508094945-962d01212c5b
+# kmodules.xyz/webhook-runtime v0.0.0-20190802202019-9e77ee949266
 kmodules.xyz/webhook-runtime/apis/workload/v1
 # sigs.k8s.io/kustomize v2.0.3+incompatible
 sigs.k8s.io/kustomize/pkg/fs
@@ -557,7 +549,7 @@ sigs.k8s.io/kustomize/pkg/expansion
 sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig
 # sigs.k8s.io/yaml v1.1.0
 sigs.k8s.io/yaml
-# stash.appscode.dev/stash v0.0.0-20190523192034-eadca45d8c6b
+# stash.appscode.dev/stash v0.9.0-rc.0
 stash.appscode.dev/stash/client/clientset/versioned/fake
 stash.appscode.dev/stash/apis
 stash.appscode.dev/stash/client/clientset/versioned/scheme
@@ -573,6 +565,7 @@ stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1alpha1
 stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1alpha1/fake
 stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1
 stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1/fake
+stash.appscode.dev/stash/client/clientset/versioned/typed/stash/v1beta1/util
 stash.appscode.dev/stash/client/listers/stash/v1alpha1
 stash.appscode.dev/stash/client/listers/stash/v1beta1
 stash.appscode.dev/stash/pkg/docker

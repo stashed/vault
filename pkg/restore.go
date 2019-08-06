@@ -21,7 +21,7 @@ func NewCmdRestore() *cobra.Command {
 		namespace      string
 		appBindingName string
 		outputDir      string
-		mysqlArgs      string
+		myArgs         string
 		setupOpt       = restic.SetupOptions{
 			ScratchDir:  restic.DefaultScratchDir,
 			EnableCache: false,
@@ -94,8 +94,8 @@ func NewCmdRestore() *cobra.Command {
 					"-h", appBinding.Spec.ClientConfig.Service.Name,
 				},
 			}
-			if mysqlArgs != "" {
-				dumpOpt.StdoutPipeCommand.Args = append(dumpOpt.StdoutPipeCommand.Args, mysqlArgs)
+			if myArgs != "" {
+				dumpOpt.StdoutPipeCommand.Args = append(dumpOpt.StdoutPipeCommand.Args, myArgs)
 			}
 
 			// wait for DB ready
@@ -121,7 +121,7 @@ func NewCmdRestore() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&mysqlArgs, "mysql-args", mysqlArgs, "Additional arguments")
+	cmd.Flags().StringVar(&myArgs, "mysql-args", myArgs, "Additional arguments")
 
 	cmd.Flags().StringVar(&masterURL, "master", masterURL, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	cmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", kubeconfigPath, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
@@ -139,6 +139,7 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().IntVar(&setupOpt.MaxConnections, "max-connections", setupOpt.MaxConnections, "Specify maximum concurrent connections for GCS, Azure and B2 backend")
 
 	cmd.Flags().StringVar(&dumpOpt.Host, "hostname", dumpOpt.Host, "Name of the host machine")
+	cmd.Flags().StringVar(&dumpOpt.SourceHost, "source-hostname", dumpOpt.SourceHost, "Name of the host from where data will be restored")
 	// TODO: sliceVar
 	cmd.Flags().StringVar(&dumpOpt.Snapshot, "snapshot", dumpOpt.Snapshot, "Snapshot to dump")
 

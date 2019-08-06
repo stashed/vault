@@ -31,7 +31,7 @@ func NewCmdBackup() *cobra.Command {
 		namespace      string
 		appBindingName string
 		outputDir      string
-		mysqlArgs      = "--all-databases"
+		myArgs         = "--all-databases"
 		setupOpt       = restic.SetupOptions{
 			ScratchDir:  restic.DefaultScratchDir,
 			EnableCache: false,
@@ -104,8 +104,8 @@ func NewCmdBackup() *cobra.Command {
 					"-h", appBinding.Spec.ClientConfig.Service.Name,
 				},
 			}
-			if mysqlArgs != "" {
-				backupOpt.StdinPipeCommand.Args = append(backupOpt.StdinPipeCommand.Args, mysqlArgs)
+			if myArgs != "" {
+				backupOpt.StdinPipeCommand.Args = append(backupOpt.StdinPipeCommand.Args, myArgs)
 			}
 
 			// wait for DB ready
@@ -131,7 +131,7 @@ func NewCmdBackup() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&mysqlArgs, "mysql-args", mysqlArgs, "Additional arguments")
+	cmd.Flags().StringVar(&myArgs, "mysql-args", myArgs, "Additional arguments")
 
 	cmd.Flags().StringVar(&masterURL, "master", masterURL, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	cmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", kubeconfigPath, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")

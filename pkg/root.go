@@ -16,7 +16,7 @@ import (
 
 func NewRootCmd() *cobra.Command {
 	var rootCmd = &cobra.Command{
-		Use:               "mysql-stash",
+		Use:               "stash-mysql",
 		Short:             `MySQL backup & restore plugin for Stash by AppsCode`,
 		Long:              `MySQL backup & restore plugin for Stash by AppsCode. For more information, visit here: https://appscode.com/products/stash`,
 		DisableAutoGenTag: true,
