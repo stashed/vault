@@ -11,7 +11,6 @@ const (
 	RepositoryBucket     = "REPOSITORY_BUCKET"
 	RepositoryPrefix     = "REPOSITORY_PREFIX"
 	RepositoryEndpoint   = "REPOSITORY_ENDPOINT"
-	RepositoryURL        = "REPOSITORY_URL"
 
 	Hostname       = "HOSTNAME"
 	SourceHostname = "SOURCE_HOSTNAME"
@@ -55,5 +54,9 @@ const (
 
 	StatusSubresourceEnabled = "ENABLE_STATUS_SUBRESOURCE"
 
-	PushgatewayURL = "PROMETHEUS_PUSHGATEWAY_URL"
+	PushgatewayURL    = "PROMETHEUS_PUSHGATEWAY_URL"
+	PrometheusJobName = "PROMETHEUS_JOB_NAME"
+
+	StashDefaultVolume    = "stash-volume"
+	StashDefaultMountPath = "/stash-data"
 )

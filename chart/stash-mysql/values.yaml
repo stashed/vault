@@ -13,8 +13,3 @@ backup:
   myArgs: "--all-databases"
 restore:
   myArgs: ""
-
-# default values for prometheus metrics
-metrics:
-  enabled: true
-  labels: []
