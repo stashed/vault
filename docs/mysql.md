@@ -39,7 +39,7 @@ $ kubectl create ns demo
 namespace/demo created
 ```
 
-> Note: YAML files used in this tutorial are stored [here](https://github.com/stashed/mysql/tree/master/docs/examples).
+> Note: YAML files used in this tutorial are stored [here](https://github.com/stashed/mysql/tree/{{< param "info.subproject_version" >}}/docs/examples).
 
 ## Backup MySQL
 
