@@ -4,7 +4,7 @@ metadata:
   name: restored-mysql
   namespace: demo
 spec:
-  version: "5.7.25"
+  version: "8.0.3"
   databaseSecret:
     secretName: sample-mysql-auth
   replicas: 1
