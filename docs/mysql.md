@@ -60,7 +60,7 @@ metadata:
   name: sample-mysql
   namespace: demo
 spec:
-  version: "8.0.3"
+  version: "8.0.14"
   replicas: 1
   storageType: Durable
   storage:
@@ -85,8 +85,8 @@ Let's check if the database is ready to use,
 
 ```bash
 $ kubectl get my -n demo sample-mysql
-NAME           VERSION  STATUS    AGE
-sample-mysql   8.0.3    Running   4m22s
+NAME           VERSION   STATUS    AGE
+sample-mysql   8.0.14    Running   4m22s
 ```
 
 The database is `Running`. Verify that KubeDB has created a Secret and a Service for this database using the following commands,
@@ -131,7 +131,7 @@ metadata:
     app.kubernetes.io/instance: sample-mysql
     app.kubernetes.io/managed-by: kubedb.com
     app.kubernetes.io/name: mysql
-    app.kubernetes.io/version: 8.0.3
+    app.kubernetes.io/version: 8.0.14
     kubedb.com/kind: MySQL
     kubedb.com/name: sample-mysql
   name: sample-mysql
@@ -147,7 +147,7 @@ spec:
   secret:
     name: sample-mysql-auth
   type: kubedb.com/mysql
-  version: 8.0.3
+  version: 8.0.14
 ```
 
 Stash uses the AppBinding CRD to connect with the target database. It requires the following two fields to set in AppBinding's `.spec` section.
@@ -210,7 +210,7 @@ $ kubectl exec -it -n demo sample-mysql-0 -- mysql --user=root --password=5HEqoo
 mysql: [Warning] Using a password on the command line interface can be insecure.
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 10
-Server version: 8.0.3 MySQL Community Server - GPL
+Server version: 8.0.14 MySQL Community Server - GPL
 
 Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
@@ -326,7 +326,7 @@ metadata:
 spec:
   schedule: "*/5 * * * *"
   task:
-    name: mysql-backup-8.0.3
+    name: mysql-backup-8.0.14
   repository:
     name: gcs-repo
   target:
@@ -421,8 +421,8 @@ Now, wait for a moment. Stash will pause the BackupConfiguration. Verify that th
 
 ```console
 $ kubectl get backupconfiguration -n demo sample-mysql-backup
-NAME                 TASK                 SCHEDULE      PAUSED   AGE
-sample-mysql-backup  mysql-backup-8.0.3   */5 * * * *   true     26m
+NAME                 TASK                  SCHEDULE      PAUSED   AGE
+sample-mysql-backup  mysql-backup-8.0.14   */5 * * * *   true     26m
 ```
 
 Notice the `PAUSED` column. Value `true` for this field means that the BackupConfiguration has been paused.
@@ -443,7 +443,7 @@ metadata:
   name: restored-mysql
   namespace: demo
 spec:
-  version: "8.0.3"
+  version: "8.0.14"
   databaseSecret:
     secretName: sample-mysql-auth
   replicas: 1
@@ -475,8 +475,8 @@ If you check the database status, you will see it is stuck in **`Initializing`**
 
 ```bash
 $ kubectl get my -n demo restored-mysql
-NAME             VERSION  STATUS         AGE
-restored-mysql   8.0.3    Initializing   61s
+NAME             VERSION   STATUS         AGE
+restored-mysql   8.0.14    Initializing   61s
 ```
 
 **Create RestoreSession:**
@@ -505,7 +505,7 @@ metadata:
     kubedb.com/kind: MySQL # this label is mandatory if you are using KubeDB to deploy the database.
 spec:
   task:
-    name: mysql-restore-8.0.3
+    name: mysql-restore-8.0.14
   repository:
     name: gcs-repo
   target:
@@ -556,8 +556,8 @@ At first, check if the database has gone into **`Running`** state by the followi
 
 ```bash
 $ kubectl get my -n demo restored-mysql
-NAME             VERSION  STATUS    AGE
-restored-mysql   8.0.3    Running   34m
+NAME             VERSION   STATUS    AGE
+restored-mysql   8.0.14    Running   34m
 ```
 
 Now, find out the database Pod by the following command,
@@ -587,7 +587,7 @@ $ kubectl exec -it -n demo restored-mysql-0 -- mysql --user=root --password=5HEq
 mysql: [Warning] Using a password on the command line interface can be insecure.
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 9
-Server version: 8.0.3 MySQL Community Server - GPL
+Server version: 8.0.14 MySQL Community Server - GPL
 
 Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
