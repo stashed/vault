@@ -7,12 +7,12 @@
 ```console
 $ helm repo add appscode https://charts.appscode.com/stable/
 $ helm repo update
-$ helm install appscode/stash-mysql --name=stash-mysql-8.0.14 --version=8.0.14
+$ helm install appscode/stash-mysql --name=stash-mysql-5.7.25 --version=5.7.25
 ```
 
 ## Introduction
 
-This chart installs necessary `Functions` and `Tasks` definitions to take backup of MySQL-8.0.14 databases and restore them using Stash.
+This chart installs necessary `Functions` and `Tasks` definitions to take backup of MySQL-5.7.25 databases and restore them using Stash.
 
 ## Prerequisites
 
@@ -32,20 +32,20 @@ $ helm repo add appscode https://charts.appscode.com/stable/
 $ helm repo update
 ```
 
-- Install the chart with the release name `stash-mysql-8.0.14` run the following command,
+- Install the chart with the release name `stash-mysql-5.7.25` run the following command,
 
 ```console
-$ helm install appscode/stash-mysql --name=stash-mysql-8.0.14 --version=8.0.14
+$ helm install appscode/stash-mysql --name=stash-mysql-5.7.25 --version=5.7.25
 ```
 
-The above commands installs `Functions` and `Task` CRDs that are necessary to take backup of MySQL-8.0.14 databases and restore them using Stash.
+The above commands installs `Functions` and `Task` CRDs that are necessary to take backup of MySQL-5.7.25 databases and restore them using Stash.
 
 ## Uninstalling the Chart
 
-To uninstall/delete the `stash-mysql-8.0.14` run the following command,
+To uninstall/delete the `stash-mysql-5.7.25` run the following command,
 
 ```console
-helm delete stash-mysql-8.0.14 --purge
+helm delete stash-mysql-5.7.25 --purge
 ```
 
 The command removes all the Kubernetes components associated with the chart and deletes the release.
@@ -58,7 +58,7 @@ The following table lists the configurable parameters of the `stash-mysql` chart
 | :---------------: | -------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------: |
 | `docker.registry` | Docker registry used to pull respective images                                                                                                     |     `stashed`     |
 | `docker.image`    | Docker image used to take backup of MySQL databases and restore them                                                                               |   `stash-mysql`   |
-| `docker.tag`      | Tag of the image that is used to take backup of MySQL databases and restore them. This is usually same as the database version it can take backup. |       `8.0.14`    |
+| `docker.tag`      | Tag of the image that is used to take backup of MySQL databases and restore them. This is usually same as the database version it can take backup. |       `5.7.25`    |
 | `backup.myArgs`   | Optional arguments to pass to `mysqldump` command  during bakcup process                                                                           | `--all-databases` |
 | `restore.myArgs`  | Optional arguments to pass to `mysql` command during restore process                                                                               |        ""         |
 
@@ -67,6 +67,6 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 For example:
 
 ```console
-helm install --name stash-mysql-8.0.14 ---set docker.registry=my-registry appscode/stash-mysql
+helm install --name stash-mysql-5.7.25 ---set docker.registry=my-registry appscode/stash-mysql
 ```
 

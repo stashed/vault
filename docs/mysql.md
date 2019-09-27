@@ -60,7 +60,7 @@ metadata:
   name: sample-mysql
   namespace: demo
 spec:
-  version: "8.0.14"
+  version: "5.7.25"
   replicas: 1
   storageType: Durable
   storage:
@@ -86,7 +86,7 @@ Let's check if the database is ready to use,
 ```bash
 $ kubectl get my -n demo sample-mysql
 NAME           VERSION   STATUS    AGE
-sample-mysql   8.0.14    Running   4m22s
+sample-mysql   5.7.25    Running   4m22s
 ```
 
 The database is `Running`. Verify that KubeDB has created a Secret and a Service for this database using the following commands,
@@ -124,27 +124,18 @@ $ kubectl get appbindings -n demo sample-mysql -o yaml
 apiVersion: appcatalog.appscode.com/v1alpha1
 kind: AppBinding
 metadata:
-  creationTimestamp: "2019-08-02T05:13:37Z"
+  creationTimestamp: "2019-09-27T05:07:34Z"
   generation: 1
   labels:
     app.kubernetes.io/component: database
     app.kubernetes.io/instance: sample-mysql
     app.kubernetes.io/managed-by: kubedb.com
     app.kubernetes.io/name: mysql
-    app.kubernetes.io/version: 8.0.14
+    app.kubernetes.io/version: 5.7.25
     kubedb.com/kind: MySQL
     kubedb.com/name: sample-mysql
   name: sample-mysql
   namespace: demo
-  ownerReferences:
-  - apiVersion: kubedb.com/v1alpha1
-    blockOwnerDeletion: false
-    kind: MySQL
-    name: sample-mysql
-    uid: dab30216-485f-405a-af4f-09fe5f0ad88e
-  resourceVersion: "7970"
-  selfLink: /apis/appcatalog.appscode.com/v1alpha1/namespaces/demo/appbindings/sample-mysql
-  uid: d2a932e5-924f-4321-b206-7b9da534cf12
 spec:
   clientConfig:
     service:
@@ -156,7 +147,7 @@ spec:
   secret:
     name: sample-mysql-auth
   type: kubedb.com/mysql
-  version: 8.0.14
+  version: 5.7.25
 ```
 
 Stash uses the AppBinding CRD to connect with the target database. It requires the following two fields to set in AppBinding's `.spec` section.
@@ -219,7 +210,7 @@ $ kubectl exec -it -n demo sample-mysql-0 -- mysql --user=root --password=5HEqoo
 mysql: [Warning] Using a password on the command line interface can be insecure.
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 10
-Server version: 8.0.14 MySQL Community Server - GPL
+Server version: 5.7.25 MySQL Community Server - GPL
 
 Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
@@ -335,7 +326,7 @@ metadata:
 spec:
   schedule: "*/5 * * * *"
   task:
-    name: mysql-backup-8.0.14
+    name: mysql-backup-5.7.25
   repository:
     name: gcs-repo
   target:
@@ -344,6 +335,7 @@ spec:
       kind: AppBinding
       name: sample-mysql
   retentionPolicy:
+    name: keep-last-5
     keepLast: 5
     prune: true
 ```
@@ -380,13 +372,16 @@ The `sample-mysql-backup` CronJob will trigger a backup on each scheduled slot b
 Wait for a schedule to appear. Run the following command to watch `BackupSession` CRD,
 
 ```bash
-$ kubectl get backupsession -n demo -w
-NAME                             BACKUPCONFIGURATION   PHASE     AGE
-sample-mysql-backup-1564729507   sample-mysql-backup   Running   51s
-sample-mysql-backup-1564729507   sample-mysql-backup   Succeeded   51s
+$ watch -n 1 kubectl get backupsession -n demo -l=stash.appscode.com/backup-configuration=sample-mysql-backup
+
+Every 1.0s: kubectl get backupsession -n demo -l=stash.appscode.com/backup-configuration=sample-mysql-backup   workstation: Fri Sep 27 11:14:43 2019
+NAMESPACE   NAME                             BACKUPCONFIGURATION   PHASE       AGE
+demo        sample-mysql-backup-1569561245   sample-mysql-backup   Succeeded   38s
 ```
 
 Here, the phase **`Succeeded`** means that the backupsession has been succeeded.
+
+>Note: Backup CronJob creates `BackupSession` crds with the following label `stash.appscode.com/backup-configuration=<BackupConfiguration crd name>`. We can use this label to watch only the `BackupSession` of our desired `BackupConfiguration`.
 
 **Verify Backup:**
 
@@ -395,7 +390,7 @@ Now, we are going to verify whether the backed up data is in the backend. Once a
 ```bash
 $ kubectl get repository -n demo gcs-repo
 NAME       INTEGRITY   SIZE        SNAPSHOT-COUNT   LAST-SUCCESSFUL-BACKUP   AGE
-gcs-repo   true        6.815 MiB   2                3m39s                    30m
+gcs-repo   true        6.815 MiB   1                3m39s                    30m
 ```
 
 Now, if we navigate to the GCS bucket, we will see the backed up data has been stored in `demo/mysql/sample-mysql` directory as specified by `.spec.backend.gcs.prefix` field of Repository CRD.
@@ -427,7 +422,7 @@ Now, wait for a moment. Stash will pause the BackupConfiguration. Verify that th
 ```console
 $ kubectl get backupconfiguration -n demo sample-mysql-backup
 NAME                 TASK                  SCHEDULE      PAUSED   AGE
-sample-mysql-backup  mysql-backup-8.0.14   */5 * * * *   true     26m
+sample-mysql-backup  mysql-backup-5.7.25   */5 * * * *   true     26m
 ```
 
 Notice the `PAUSED` column. Value `true` for this field means that the BackupConfiguration has been paused.
@@ -448,7 +443,7 @@ metadata:
   name: restored-mysql
   namespace: demo
 spec:
-  version: "8.0.14"
+  version: "5.7.25"
   databaseSecret:
     secretName: sample-mysql-auth
   replicas: 1
@@ -481,7 +476,7 @@ If you check the database status, you will see it is stuck in **`Initializing`**
 ```bash
 $ kubectl get my -n demo restored-mysql
 NAME             VERSION   STATUS         AGE
-restored-mysql   8.0.14    Initializing   61s
+restored-mysql   5.7.25    Initializing   61s
 ```
 
 **Create RestoreSession:**
@@ -510,7 +505,7 @@ metadata:
     kubedb.com/kind: MySQL # this label is mandatory if you are using KubeDB to deploy the database.
 spec:
   task:
-    name: mysql-restore-8.0.14
+    name: mysql-restore-5.7.25
   repository:
     name: gcs-repo
   target:
@@ -544,10 +539,11 @@ Once, you have created the RestoreSession object, Stash will create a restore Jo
 Run the following command to watch the phase of the RestoreSession object,
 
 ```bash
-$ kubectl get restoresession -n demo sample-mysql-restore -w
-NAME                   REPOSITORY-NAME   PHASE       AGE
-sample-mysql-restore   gcs-repo          Running     3m15s
-sample-mysql-restore   gcs-repo          Succeeded   3m28s
+$ watch -n 1 kubectl get restoresession -n demo restore-sample-mysql
+
+Every 1.0s: kubectl get restoresession -n demo  restore-sample-mysql    workstation: Fri Sep 27 11:18:51 2019
+NAMESPACE   NAME                   REPOSITORY-NAME   PHASE       AGE
+demo        restore-sample-mysql   gcs-repo          Succeeded   59s
 ```
 
 Here, we can see from the output of the above command that the restore process succeeded.
@@ -561,7 +557,7 @@ At first, check if the database has gone into **`Running`** state by the followi
 ```bash
 $ kubectl get my -n demo restored-mysql
 NAME             VERSION   STATUS    AGE
-restored-mysql   8.0.14    Running   34m
+restored-mysql   5.7.25    Running   34m
 ```
 
 Now, find out the database Pod by the following command,
@@ -591,7 +587,7 @@ $ kubectl exec -it -n demo restored-mysql-0 -- mysql --user=root --password=5HEq
 mysql: [Warning] Using a password on the command line interface can be insecure.
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 9
-Server version: 8.0.14 MySQL Community Server - GPL
+Server version: 5.7.25 MySQL Community Server - GPL
 
 Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
@@ -640,15 +636,9 @@ So, from the above output, we can see that the `playground` database and the `eq
 To cleanup the Kubernetes resources created by this tutorial, run:
 
 ```bash
-$ kubectl delete restoresession -n demo sample-mysql-restore
-restoresession.stash.appscode.com "restore-sample-mysql" deleted
-
-$ kubectl delete backupconfiguration -n demo sample-mysql-backup
-backupconfiguration.stash.appscode.com "sample-mysql-backup" deleted
-
-$ kubectl delete my -n demo restored-mysql
-mysql.kubedb.com "restored-mysql" deleted
-
-$ kubectl delete my -n demo sample-mysql
-mysql.kubedb.com "sample-mysql" deleted
+kubectl delete backupconfiguration -n demo sample-mysql-backup
+kubectl delete restoresession -n demo restore-sample-mysql
+kubectl delete repository -n demo gcs-repo
+kubectl delete my -n demo restored-mysql
+kubectl delete my -n demo sample-mysql
 ```

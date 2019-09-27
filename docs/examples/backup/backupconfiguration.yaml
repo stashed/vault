@@ -6,7 +6,7 @@ metadata:
 spec:
   schedule: "*/5 * * * *"
   task:
-    name: mysql-backup-8.0.14
+    name: mysql-backup-5.7.25
   repository:
     name: gcs-repo
   target:
@@ -15,5 +15,6 @@ spec:
       kind: AppBinding
       name: sample-mysql
   retentionPolicy:
+    name: keep-last-5
     keepLast: 5
     prune: true
