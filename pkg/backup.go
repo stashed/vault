@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/appscode/go/flags"
 	"github.com/spf13/cobra"
@@ -147,8 +148,8 @@ func (opt *mysqlOptions) backupMySQL() (*restic.BackupOutput, error) {
 			"-h", appBinding.Spec.ClientConfig.Service.Name,
 		},
 	}
-	if opt.myArgs != "" {
-		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, opt.myArgs)
+	for _, arg := range strings.Fields(opt.myArgs) {
+		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, arg)
 	}
 
 	// wait for DB ready
