@@ -1,11 +1,11 @@
-name: Go
+name: CI
 
 on:
   push:
     branches-ignore:
       - 'release-*'
     tags-ignore:
-      - '*.*.*'
+      - '*.*'
 
 jobs:
 
@@ -26,9 +26,14 @@ jobs:
     - name: Available platforms
       run: echo ${{ steps.buildx.outputs.platforms }}
 
+    - name: Run checks
+      run: make ci
+
     - name: Build
       env:
-        DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+        REGISTRY: appscodeci
+        DOCKER_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        USERNAME: 1gtm
       run: |
-        docker login docker.pkg.github.com --username stashed --password ${DOCKER_TOKEN}
-        make push REGISTRY=docker.pkg.github.com/stashed/mysql
+        docker login --username ${USERNAME} --password ${DOCKER_TOKEN}
+        make push
