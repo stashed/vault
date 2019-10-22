@@ -375,8 +375,9 @@ Wait for a schedule to appear. Run the following command to watch `BackupSession
 $ watch -n 1 kubectl get backupsession -n demo -l=stash.appscode.com/backup-configuration=sample-mysql-backup
 
 Every 1.0s: kubectl get backupsession -n demo -l=stash.appscode.com/backup-configuration=sample-mysql-backup   workstation: Fri Sep 27 11:14:43 2019
-NAMESPACE   NAME                             BACKUPCONFIGURATION   PHASE       AGE
-demo        sample-mysql-backup-1569561245   sample-mysql-backup   Succeeded   38s
+
+NAME                             INVOKER-TYPE          INVOKER-NAME          PHASE       AGE
+sample-mysql-backup-1569561245   BackupConfiguration   sample-mysql-backup   Succeeded   38s
 ```
 
 Here, the phase **`Succeeded`** means that the backupsession has been succeeded.
