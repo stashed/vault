@@ -2,13 +2,13 @@
 title: Backup & Restore MySQL | Stash
 description: Backup MySQL database using Stash
 menu:
-  product_stash_{{ .version }}:
+  docs_{{ .version }}:
     identifier: mysql-guide-{{ .subproject_version }}
     name: Backup & Restore MySQL
     parent: stash-mysql-guides-{{ .subproject_version }}
     weight: 10
 product_name: stash
-menu_name: product_stash_{{ .version }}
+menu_name: docs_{{ .version }}
 section_menu_id: stash-addons
 ---
 
