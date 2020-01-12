@@ -7,7 +7,7 @@
 ```console
 $ helm repo add appscode https://charts.appscode.com/stable/
 $ helm repo update
-$ helm install appscode/stash-mysql --name=stash-mysql-8.0.14 --version=8.0.14
+$ helm install stash-mysql-8.0.14 appscode/stash-mysql -n kube-system --version=8.0.14
 ```
 
 ## Introduction
@@ -35,7 +35,7 @@ $ helm repo update
 - Install the chart with the release name `stash-mysql-8.0.14` run the following command,
 
 ```console
-$ helm install appscode/stash-mysql --name=stash-mysql-8.0.14 --version=8.0.14
+$ helm install stash-mysql-8.0.14 appscode/stash-mysql -n kube-system --version=8.0.14
 ```
 
 The above commands installs `Functions` and `Task` CRDs that are necessary to take backup of MySQL-8.0.14 databases and restore them using Stash.
@@ -45,7 +45,7 @@ The above commands installs `Functions` and `Task` CRDs that are necessary to ta
 To uninstall/delete the `stash-mysql-8.0.14` run the following command,
 
 ```console
-helm delete stash-mysql-8.0.14 --purge
+helm uninstall stash-mysql-8.0.14 -n kube-system --purge
 ```
 
 The command removes all the Kubernetes components associated with the chart and deletes the release.
@@ -67,5 +67,5 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 For example:
 
 ```console
-helm install --name stash-mysql-8.0.14 ---set docker.registry=my-registry appscode/stash-mysql
+helm install stash-mysql-8.0.14 appscode/stash-mysql -n kube-system ---set docker.registry=my-registry
 ```

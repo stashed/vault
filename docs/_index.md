@@ -5,6 +5,6 @@ menu:
     identifier: stash-mysql-guides-{{ .subproject_version }}
     name: {{ .subproject_version }}
     parent: stash-mysql-guides
-    weight: 50
+    weight: 30
 menu_name: docs_{{ .version }}
 ---
