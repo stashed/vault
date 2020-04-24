@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "stash-mysql.labels" . | nindent 4 }}
 spec:
-  image: {{ .Values.docker.registry }}/{{ .Values.docker.image }}:{{ .Values.docker.tag }}
+  image: {{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   args:
   - restore-mysql
   # setup information
@@ -20,7 +20,7 @@ spec:
   - --max-connections=${MAX_CONNECTIONS:=0} # 0 indicates use default connection limit
   - --hostname=${HOSTNAME:=}
   - --source-hostname=${SOURCE_HOSTNAME:=}
-  - --mysql-args=${myArgs:={{ .Values.restore.myArgs }}} # optional arguments pass to mysql command
+  - --mysql-args=${args:={{ .Values.restore.args }}} # optional arguments pass to mysql command
   # target information
   - --namespace=${NAMESPACE:=default}
   - --appbinding=${TARGET_NAME:=}

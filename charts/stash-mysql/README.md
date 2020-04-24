@@ -54,13 +54,13 @@ The command removes all the Kubernetes components associated with the chart and 
 
 The following table lists the configurable parameters of the `stash-mysql` chart and their default values.
 
-|     Parameter     |                                                                    Description                                                                     |      Default      |
-| :---------------: | -------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------: |
-| `docker.registry` | Docker registry used to pull respective images                                                                                                     |     `stashed`     |
-| `docker.image`    | Docker image used to take backup of MySQL databases and restore them                                                                               |   `stash-mysql`   |
-| `docker.tag`      | Tag of the image that is used to take backup of MySQL databases and restore them. This is usually same as the database version it can take backup. |       `8.0.14`    |
-| `backup.myArgs`   | Optional arguments to pass to `mysqldump` command  during bakcup process                                                                           | `--all-databases` |
-| `restore.myArgs`  | Optional arguments to pass to `mysql` command during restore process                                                                               |        ""         |
+|     Parameter      |                                                                    Description                                                                     |      Default      |
+| :----------------: | -------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------: |
+| `image.registry`   | Docker registry used to pull respective images                                                                                                     |     `stashed`     |
+| `image.repository` | Docker image used to take backup of MySQL databases and restore them                                                                               |   `stash-mysql`   |
+| `image.tag`        | Tag of the image that is used to take backup of MySQL databases and restore them. This is usually same as the database version it can take backup. |       `8.0.14`    |
+| `backup.args`      | Optional arguments to pass to `mysqldump` command  during bakcup process                                                                           | `--all-databases` |
+| `restore.args`     | Optional arguments to pass to `mysql` command during restore process                                                                               |        ""         |
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`.
 

@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "stash-mysql.labels" . | nindent 4 }}
 spec:
-  image: {{ .Values.docker.registry }}/{{ .Values.docker.image }}:{{- .Values.docker.tag }}
+  image: {{ .Values.image.registry }}/{{ .Values.image.repository }}:{{- .Values.image.tag }}
   args:
   - backup-mysql
   # setup information
@@ -19,7 +19,7 @@ spec:
   - --enable-cache=${ENABLE_CACHE:=true}
   - --max-connections=${MAX_CONNECTIONS:=0} # 0 indicates use default connection limit
   - --hostname=${HOSTNAME:=}
-  - --mysql-args=${myArgs:={{ .Values.backup.myArgs }}} # optional arguments pass to mysqldump command
+  - --mysql-args=${args:={{ .Values.backup.args }}} # optional arguments pass to mysqldump command
   # target information
   - --namespace=${NAMESPACE:=default}
   - --appbinding=${TARGET_NAME:=}

@@ -12,7 +12,7 @@ spec:
       value: /tmp/output
     - name: secretVolume
       value: secret-volume
-    # - name: myArgs
+    # - name: args
     #   value: "--all-databases"
   - name: update-status
     params:
