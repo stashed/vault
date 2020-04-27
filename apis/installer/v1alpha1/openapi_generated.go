@@ -15510,7 +15510,6 @@ func schema_mysql_apis_installer_v1alpha1_MySQLBackup(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"args"},
 			},
 		},
 	}
@@ -15529,7 +15528,6 @@ func schema_mysql_apis_installer_v1alpha1_MySQLRestore(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"args"},
 			},
 		},
 	}

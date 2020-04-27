@@ -37,10 +37,12 @@ message ImageRef {
 }
 
 message MySQLBackup {
+  // +optional
   optional string args = 1;
 }
 
 message MySQLRestore {
+  // +optional
   optional string args = 1;
 }
 

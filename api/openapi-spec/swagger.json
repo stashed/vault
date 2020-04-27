@@ -887,9 +887,6 @@
     },
     "dev.appscode.stash.mysql.apis.installer.v1alpha1.MySQLBackup": {
       "type": "object",
-      "required": [
-        "args"
-      ],
       "properties": {
         "args": {
           "type": "string"
@@ -898,9 +895,6 @@
     },
     "dev.appscode.stash.mysql.apis.installer.v1alpha1.MySQLRestore": {
       "type": "object",
-      "required": [
-        "args"
-      ],
       "properties": {
         "args": {
           "type": "string"

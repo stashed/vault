@@ -43,9 +43,9 @@ type StashMySQL struct {
 
 // StashMySQLSpec is the schema for Stash MySQL values file
 type StashMySQLSpec struct {
-	//+optional
+	// +optional
 	NameOverride string `json:"nameOverride" protobuf:"bytes,1,opt,name=nameOverride"`
-	//+optional
+	// +optional
 	FullnameOverride string       `json:"fullnameOverride" protobuf:"bytes,2,opt,name=fullnameOverride"`
 	Image            ImageRef     `json:"image" protobuf:"bytes,3,opt,name=image"`
 	Backup           MySQLBackup  `json:"backup" protobuf:"bytes,4,opt,name=backup"`
@@ -59,10 +59,12 @@ type ImageRef struct {
 }
 
 type MySQLBackup struct {
+	// +optional
 	Args string `json:"args" protobuf:"bytes,1,opt,name=args"`
 }
 
 type MySQLRestore struct {
+	// +optional
 	Args string `json:"args" protobuf:"bytes,1,opt,name=args"`
 }
 
