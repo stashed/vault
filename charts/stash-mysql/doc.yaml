@@ -1,0 +1,19 @@
+project:
+  name: stash-mysql
+  shortName: stash-mysql
+  url: https://github.com/stashed/mysql
+  description: "MySQL database backup/restore plugin for [Stash by AppsCode](https://stash.run)"
+  app: "necessary `Function` and `Task` definition to backup or restore MySQL database 8.0.14 using Stash"
+repository:
+  url: https://charts.appscode.com/stable/
+  name: appscode
+chart:
+  name: stash-mysql
+  version: "8.0.14"
+  values: "-- generate from values file --"
+  valuesExample: "-- generate from values file --"
+prerequisites:
+- Kubernetes 1.11+
+release:
+  name: stash-mysql-8.0.14
+  namespace: kube-system
