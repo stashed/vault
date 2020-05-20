@@ -38,7 +38,8 @@ func NewCmdBackup() *cobra.Command {
 		kubeconfigPath string
 		opt            = mysqlOptions{
 
-			myArgs: "--all-databases",
+			myArgs:      "--all-databases",
+			waitTimeout: 300,
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
 				EnableCache: false,
@@ -94,6 +95,7 @@ func NewCmdBackup() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&opt.myArgs, "mysql-args", opt.myArgs, "Additional arguments")
+	cmd.Flags().Int32Var(&opt.waitTimeout, "wait-timeout", opt.waitTimeout, "Time limit to wait for the database to be ready")
 
 	cmd.Flags().StringVar(&masterURL, "master", masterURL, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	cmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", kubeconfigPath, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
@@ -171,7 +173,10 @@ func (opt *mysqlOptions) backupMySQL() (*restic.BackupOutput, error) {
 	}
 
 	// wait for DB ready
-	waitForDBReady(appBinding.Spec.ClientConfig.Service.Name, appBinding.Spec.ClientConfig.Service.Port)
+	err = waitForDBReady(appBinding, appBindingSecret, opt.waitTimeout)
+	if err != nil {
+		return nil, err
+	}
 
 	// Run backup
 	return resticWrapper.RunBackup(opt.backupOptions)

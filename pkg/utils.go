@@ -18,13 +18,14 @@ package pkg
 
 import (
 	"fmt"
-	"os/exec"
-	"time"
 
 	"stash.appscode.dev/apimachinery/pkg/restic"
 
 	"github.com/appscode/go/log"
+	"github.com/codeskyblue/go-sh"
+	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 )
 
@@ -44,6 +45,7 @@ type mysqlOptions struct {
 	namespace      string
 	appBindingName string
 	myArgs         string
+	waitTimeout    int32
 	outputDir      string
 
 	setupOptions  restic.SetupOptions
@@ -51,14 +53,15 @@ type mysqlOptions struct {
 	dumpOptions   restic.DumpOptions
 }
 
-func waitForDBReady(host string, port int32) {
-	log.Infoln("Checking database connection")
-	cmd := fmt.Sprintf(`nc "%s" "%d" -w 30`, host, port)
-	for {
-		if err := exec.Command(cmd).Run(); err != nil {
-			break
-		}
-		log.Infoln("Waiting... database is not ready yet")
-		time.Sleep(5 * time.Second)
+func waitForDBReady(appBinding *v1alpha1.AppBinding, secret *core.Secret, waitTimeout int32) error {
+	log.Infoln("Waiting for the database to be ready.....")
+	shell := sh.NewSession()
+	shell.SetEnv(EnvMySqlPassword, string(secret.Data[MySqlPassword]))
+	args := []interface{}{
+		"ping",
+		"--host", appBinding.Spec.ClientConfig.Service.Name,
+		"--user=root",
+		fmt.Sprintf("--wait=%d", waitTimeout),
 	}
+	return shell.Command("mysqladmin", args...).Run()
 }

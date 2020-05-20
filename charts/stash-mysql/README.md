@@ -53,6 +53,7 @@ The following table lists the configurable parameters of the `stash-mysql` chart
 | image.tag        | Tag of the image that is used to backup/restore MySQL database. This is usually same as the database version it can backup. | `"8.0.14"`          |
 | backup.args      | Arguments to pass to `mysqldump` command  during bakcup process                                                             | `"--all-databases"` |
 | restore.args     | Arguments to pass to `mysql` command during restore process                                                                 | `""`                |
+| waitTimeout      | Time limit to wait for the database to be ready before backup/restore process.                                              | `300`               |
 
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example:

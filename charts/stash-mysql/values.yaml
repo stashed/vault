@@ -23,3 +23,6 @@ backup:
 restore:
   # Arguments to pass to `mysql` command during restore process
   args: ""
+
+# Time limit to wait for the database to be ready before backup/restore process.
+waitTimeout: 300

@@ -20,6 +20,7 @@ spec:
   - --max-connections=${MAX_CONNECTIONS:=0} # 0 indicates use default connection limit
   - --hostname=${HOSTNAME:=}
   - --mysql-args=${args:={{ .Values.backup.args }}} # optional arguments pass to mysqldump command
+  - --wait-timeout=${waitTimeout:={{ .Values.waitTimeout}}}
   # target information
   - --namespace=${NAMESPACE:=default}
   - --appbinding=${TARGET_NAME:=}
