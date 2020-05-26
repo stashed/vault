@@ -260,7 +260,7 @@ gen-bindata:
 
 .PHONY: gen-values-schema
 gen-values-schema:
-	@yq r api/crds/installer.stash.appscode.com_stashmysqls.yaml spec.validation.openAPIV3Schema.properties.spec > /tmp/stash-mysql-values.openapiv3_schema.yaml
+	@yq r api/crds/installer.stash.appscode.com_stashmysqls.v1.yaml spec.versions[0].schema.openAPIV3Schema.properties.spec > /tmp/stash-mysql-values.openapiv3_schema.yaml
 	@yq d /tmp/stash-mysql-values.openapiv3_schema.yaml description > charts/stash-mysql/values.openapiv3_schema.yaml
 
 .PHONY: gen-chart-doc
