@@ -177,7 +177,7 @@ spec:
   secret:
     name: <my_database_credentials_secret_name>
   # type field is optional. you can keep it empty.
-  # if you keep it emtpty then the value of TARGET_APP_RESOURCE variable
+  # if you keep it empty then the value of TARGET_APP_RESOURCE variable
   # will be set to "appbinding" during auto-backup.
   type: mysql
 ```
@@ -285,7 +285,7 @@ secret/gcs-secret created
 
 **Create Repository:**
 
-Now, crete a `Respository` using this secret. Below is the YAML of Repository CRD we are going to create,
+Now, crete a `Repository` using this secret. Below is the YAML of Repository CRD we are going to create,
 
 ```yaml
 apiVersion: stash.appscode.com/v1alpha1
