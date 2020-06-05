@@ -964,7 +964,8 @@
       "required": [
         "image",
         "backup",
-        "restore"
+        "restore",
+        "waitTimeout"
       ],
       "properties": {
         "backup": {
@@ -981,6 +982,10 @@
         },
         "restore": {
           "$ref": "#/definitions/dev.appscode.stash.mysql.apis.installer.v1alpha1.MySQLRestore"
+        },
+        "waitTimeout": {
+          "type": "integer",
+          "format": "int64"
         }
       }
     },

@@ -15709,8 +15709,14 @@ func schema_mysql_apis_installer_v1alpha1_StashMySQLSpec(ref common.ReferenceCal
 							Ref: ref("stash.appscode.dev/mysql/apis/installer/v1alpha1.MySQLRestore"),
 						},
 					},
+					"waitTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int64",
+						},
+					},
 				},
-				Required: []string{"image", "backup", "restore"},
+				Required: []string{"image", "backup", "restore", "waitTimeout"},
 			},
 		},
 		Dependencies: []string{
