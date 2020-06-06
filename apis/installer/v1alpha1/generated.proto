@@ -75,5 +75,7 @@ message StashMySQLSpec {
   optional MySQLBackup backup = 4;
 
   optional MySQLRestore restore = 5;
+
+  optional int64 waitTimeout = 6;
 }
 

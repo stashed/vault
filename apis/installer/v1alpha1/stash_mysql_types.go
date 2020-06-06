@@ -50,6 +50,7 @@ type StashMySQLSpec struct {
 	Image            ImageRef     `json:"image" protobuf:"bytes,3,opt,name=image"`
 	Backup           MySQLBackup  `json:"backup" protobuf:"bytes,4,opt,name=backup"`
 	Restore          MySQLRestore `json:"restore" protobuf:"bytes,5,opt,name=restore"`
+	WaitTimeout      int64        `json:"waitTimeout" protobuf:"varint,6,opt,name=waitTimeout"`
 }
 
 type ImageRef struct {

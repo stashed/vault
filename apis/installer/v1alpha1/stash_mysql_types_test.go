@@ -41,7 +41,7 @@ func TestStashMySQLDefaultValues(t *testing.T) {
 }
 
 func compareStashMySQLDefaultValues() (string, error) {
-	data, err := ioutil.ReadFile("../../../../mysql/charts/stash-mysql/values.yaml")
+	data, err := ioutil.ReadFile("../../../charts/stash-mysql/values.yaml")
 	if err != nil {
 		return "", err
 	}
