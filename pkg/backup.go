@@ -153,6 +153,12 @@ func (opt *mysqlOptions) backupMySQL() (*restic.BackupOutput, error) {
 		return nil, err
 	}
 
+	// transform secret
+	err = appBinding.TransformSecret(opt.kubeClient, appBindingSecret.Data)
+	if err != nil {
+		return nil, err
+	}
+
 	// init restic wrapper
 	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
 	if err != nil {

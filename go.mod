@@ -18,7 +18,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6
 	kmodules.xyz/client-go v0.0.0-20200525195850-2fd180961371
 	kmodules.xyz/crd-schema-fuzz v0.0.0-20200521005638-2433a187de95
-	kmodules.xyz/custom-resources v0.0.0-20200525205248-56eeb11ebcf3
+	kmodules.xyz/custom-resources v0.0.0-20200604135349-9e9f5c4fdba9
 	kmodules.xyz/offshoot-api v0.0.0-20200521035628-e135bf07b226
 	sigs.k8s.io/yaml v1.2.0
 	stash.appscode.dev/apimachinery v0.10.0-alpha.0
