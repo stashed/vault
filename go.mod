@@ -21,7 +21,7 @@ require (
 	kmodules.xyz/custom-resources v0.0.0-20200604135349-9e9f5c4fdba9
 	kmodules.xyz/offshoot-api v0.0.0-20200521035628-e135bf07b226
 	sigs.k8s.io/yaml v1.2.0
-	stash.appscode.dev/apimachinery v0.10.0-beta.0
+	stash.appscode.dev/apimachinery v0.10.0-beta.1
 )
 
 replace (
