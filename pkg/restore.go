@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
 )
@@ -71,15 +72,24 @@ func NewCmdRestore() *cobra.Command {
 				return err
 			}
 
+			targetRef := api_v1beta1.TargetRef{
+				APIVersion: appcatalog.SchemeGroupVersion.String(),
+				Kind:       appcatalog.ResourceKindApp,
+				Name:       opt.appBindingName,
+			}
+
 			var restoreOutput *restic.RestoreOutput
-			restoreOutput, err = opt.restoreMySQL()
+			restoreOutput, err = opt.restoreMySQL(targetRef)
 			if err != nil {
 				restoreOutput = &restic.RestoreOutput{
-					HostRestoreStats: []api_v1beta1.HostRestoreStats{
-						{
-							Hostname: opt.dumpOptions.Host,
-							Phase:    api_v1beta1.HostRestoreFailed,
-							Error:    err.Error(),
+					RestoreTargetStatus: api_v1beta1.RestoreMemberStatus{
+						Ref: targetRef,
+						Stats: []api_v1beta1.HostRestoreStats{
+							{
+								Hostname: opt.dumpOptions.Host,
+								Phase:    api_v1beta1.HostRestoreFailed,
+								Error:    err.Error(),
+							},
 						},
 					},
 				}
@@ -121,7 +131,7 @@ func NewCmdRestore() *cobra.Command {
 	return cmd
 }
 
-func (opt *mysqlOptions) restoreMySQL() (*restic.RestoreOutput, error) {
+func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.RestoreOutput, error) {
 	// apply nice, ionice settings from env
 	var err error
 	opt.setupOptions.Nice, err = v1.NiceSettingsFromEnv()
@@ -177,5 +187,5 @@ func (opt *mysqlOptions) restoreMySQL() (*restic.RestoreOutput, error) {
 	}
 
 	// Run dump
-	return resticWrapper.Dump(opt.dumpOptions)
+	return resticWrapper.Dump(opt.dumpOptions, targetRef)
 }
