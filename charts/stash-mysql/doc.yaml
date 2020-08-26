@@ -10,11 +10,11 @@ repository:
   name: appscode
 chart:
   name: stash-mysql
-  version: v2020.08.26-rc.0
+  version: v2020.08.26-rc.1
   values: "-- generate from values file --"
   valuesExample: "-- generate from values file --"
 prerequisites:
 - Kubernetes 1.11+
 release:
-  name: stash-mysql-v2020.08.26-rc.0
+  name: stash-mysql-v2020.08.26-rc.1
   namespace: kube-system
