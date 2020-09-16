@@ -5,23 +5,25 @@ go 1.12
 require (
 	github.com/appscode/go v0.0.0-20200323182826-54e98e09185a
 	github.com/codeskyblue/go-sh v0.0.0-20190412065543-76bd3d59ff27
-	github.com/go-openapi/spec v0.19.3
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/go-openapi/spec v0.19.7
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/google/gofuzz v1.1.0
 	github.com/spf13/cobra v0.0.5
 	github.com/yudai/gojsondiff v1.0.0
+	go.bytebuilders.dev/license-verifier/kubernetes v0.3.0
 	k8s.io/api v0.18.3
 	k8s.io/apiextensions-apiserver v0.18.3
-	k8s.io/apimachinery v0.18.3
+	k8s.io/apimachinery v0.18.8
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6
-	kmodules.xyz/client-go v0.0.0-20200905112811-2e29b973ee0c
+	kmodules.xyz/client-go v0.0.0-20200915091229-7df16c29f4e8
 	kmodules.xyz/crd-schema-fuzz v0.0.0-20200521005638-2433a187de95
 	kmodules.xyz/custom-resources v0.0.0-20200604135349-9e9f5c4fdba9
 	kmodules.xyz/offshoot-api v0.0.0-20200521035628-e135bf07b226
 	sigs.k8s.io/yaml v1.2.0
-	stash.appscode.dev/apimachinery v0.10.1-0.20200914045248-546ceea96940
+	stash.appscode.dev/apimachinery v0.10.1-0.20200916073701-0189ba363808
 )
 
 replace bitbucket.org/ww/goautoneg => gomodules.xyz/goautoneg v0.0.0-20120707110453-a547fc61f48d
@@ -62,7 +64,7 @@ replace github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.3.1
 
 replace github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 
-replace github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring => github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.0.0-20200911141619-675d303ee0b8
+replace github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring => github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.42.0
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.7.1
 
@@ -86,6 +88,6 @@ replace k8s.io/client-go => k8s.io/client-go v0.18.3
 
 replace k8s.io/component-base => k8s.io/component-base v0.18.3
 
-replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6 // release-1.18
+replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6
 
 replace k8s.io/kubernetes => github.com/kmodules/kubernetes v1.19.0-alpha.0.0.20200521033432-49d3646051ad
