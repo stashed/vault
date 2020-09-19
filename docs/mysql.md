@@ -327,7 +327,7 @@ metadata:
 spec:
   schedule: "*/5 * * * *"
   task:
-    name: mysql-backup-8.0.14
+    name: mysql-backup-{{< param "info.subproject_version" >}}
   repository:
     name: gcs-repo
   target:
@@ -424,7 +424,7 @@ Now, wait for a moment. Stash will pause the BackupConfiguration. Verify that th
 ```console
 $ kubectl get backupconfiguration -n demo sample-mysql-backup
 NAME                 TASK                  SCHEDULE      PAUSED   AGE
-sample-mysql-backup  mysql-backup-8.0.14   */5 * * * *   true     26m
+sample-mysql-backup  mysql-backup-{{< param "info.subproject_version" >}}   */5 * * * *   true     26m
 ```
 
 Notice the `PAUSED` column. Value `true` for this field means that the BackupConfiguration has been paused.
@@ -507,7 +507,7 @@ metadata:
     kubedb.com/kind: MySQL # this label is mandatory if you are using KubeDB to deploy the database.
 spec:
   task:
-    name: mysql-restore-8.0.14
+    name: mysql-restore-{{< param "info.subproject_version" >}}
   repository:
     name: gcs-repo
   target:
