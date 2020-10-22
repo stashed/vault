@@ -7,7 +7,7 @@ metadata:
     kubedb.com/kind: MySQL # this label is mandatory if you are using KubeDB to deploy the database.
 spec:
   task:
-    name: mysql-restore-8.0.14
+    name: mysql-restore-v2020.10.21
   repository:
     name: gcs-repo
   target:
@@ -16,4 +16,4 @@ spec:
       kind: AppBinding
       name: restored-mysql
   rules:
-    - snapshots: [latest]
+  - snapshots: [latest]
