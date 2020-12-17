@@ -66,5 +66,8 @@ func waitForDBReady(appBinding *v1alpha1.AppBinding, secret *core.Secret, waitTi
 		"--user=root",
 		fmt.Sprintf("--wait=%d", waitTimeout),
 	}
+	if appBinding.Spec.ClientConfig.Service.Port != 0 {
+		args = append(args, fmt.Sprintf("--port=%d", appBinding.Spec.ClientConfig.Service.Port))
+	}
 	return shell.Command("mysqladmin", args...).Run()
 }
