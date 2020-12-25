@@ -4,28 +4,30 @@
 [![Slack](https://slack.appscode.com/badge.svg)](https://slack.appscode.com)
 [![Twitter](https://img.shields.io/twitter/follow/kubestash.svg?style=social&logo=twitter&label=Follow)](https://twitter.com/intent/follow?screen_name=KubeStash)
 
+{{ $v := semver .version -}}
+
 # MySQL
 
 MySQL backup and restore plugin for [Stash by AppsCode](https://stash.run).
 
 ## Install
 
-Install MySQL 8.0.14 backup or restore plugin for Stash as below.
+Install MySQL {{ $v.Major }}.{{ $v.Minor }}.{{ $v.Patch }} backup or restore plugin for Stash as below.
 
 ```console
 helm repo add appscode https://charts.appscode.com/stable/
 helm repo update
-helm install stash-mysql-8.0.14 appscode/stash-mysql --version=8.0.14 --namespace=kube-system
+helm install stash-mysql-{{ .version }} appscode/stash-mysql --version={{ .version }} --namespace=kube-system
 ```
 
 To install catalog for all supported MySQL versions, please visit [here](https://github.com/stashed/catalog).
 
 ## Uninstall
 
-Uninstall MySQL 8.0.14 backup or restore plugin for Stash as below.
+Uninstall MySQL {{ $v.Major }}.{{ $v.Minor }}.{{ $v.Patch }} backup or restore plugin for Stash as below.
 
 ```console
-helm uninstall stash-mysql-8.0.14 --namespace=kube-system
+helm uninstall stash-mysql-{{ .version }} --namespace=kube-system
 ```
 
 ## Support
