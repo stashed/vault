@@ -21,12 +21,12 @@ import (
 )
 
 const (
-	ResourceKindStashMySQL = "StashMySQL"
-	ResourceStashMySQL     = "stashmysql"
-	ResourceStashMySQLs    = "stashmysqls"
+	ResourceKindStashMysql = "StashMysql"
+	ResourceStashMysql     = "stashmysql"
+	ResourceStashMysqls    = "stashmysqls"
 )
 
-// StashMySQL defines the schama for Stash MySQL Installer.
+// StashMysql defines the schama for Stash MySQL Installer.
 
 // +genclient
 // +genclient:skipVerbs=updateStatus
@@ -35,46 +35,46 @@ const (
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=stashmysqls,singular=stashmysql,categories={stash,appscode}
-type StashMySQL struct {
+type StashMysql struct {
 	metav1.TypeMeta   `json:",inline,omitempty"`
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Spec              StashMySQLSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              StashMysqlSpec `json:"spec,omitempty"`
 }
 
-// StashMySQLSpec is the schema for Stash MySQL values file
-type StashMySQLSpec struct {
+// StashMysqlSpec is the schema for Stash MySQL values file
+type StashMysqlSpec struct {
 	// +optional
-	NameOverride string `json:"nameOverride" protobuf:"bytes,1,opt,name=nameOverride"`
+	NameOverride string `json:"nameOverride"`
 	// +optional
-	FullnameOverride string       `json:"fullnameOverride" protobuf:"bytes,2,opt,name=fullnameOverride"`
-	Image            ImageRef     `json:"image" protobuf:"bytes,3,opt,name=image"`
-	Backup           MySQLBackup  `json:"backup" protobuf:"bytes,4,opt,name=backup"`
-	Restore          MySQLRestore `json:"restore" protobuf:"bytes,5,opt,name=restore"`
-	WaitTimeout      int64        `json:"waitTimeout" protobuf:"varint,6,opt,name=waitTimeout"`
+	FullnameOverride string       `json:"fullnameOverride"`
+	Image            ImageRef     `json:"image"`
+	Backup           MySQLBackup  `json:"backup"`
+	Restore          MySQLRestore `json:"restore"`
+	WaitTimeout      int64        `json:"waitTimeout"`
 }
 
 type ImageRef struct {
-	Registry   string `json:"registry" protobuf:"bytes,1,opt,name=registry"`
-	Repository string `json:"repository" protobuf:"bytes,2,opt,name=repository"`
-	Tag        string `json:"tag" protobuf:"bytes,3,opt,name=tag"`
+	Registry   string `json:"registry"`
+	Repository string `json:"repository"`
+	Tag        string `json:"tag"`
 }
 
 type MySQLBackup struct {
 	// +optional
-	Args string `json:"args" protobuf:"bytes,1,opt,name=args"`
+	Args string `json:"args"`
 }
 
 type MySQLRestore struct {
 	// +optional
-	Args string `json:"args" protobuf:"bytes,1,opt,name=args"`
+	Args string `json:"args"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// StashMySQLList is a list of StashMySQLs
-type StashMySQLList struct {
+// StashMysqlList is a list of StashMysqls
+type StashMysqlList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Items is a list of StashMySQL CRD objects
-	Items []StashMySQL `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+	// Items is a list of StashMysql CRD objects
+	Items []StashMysql `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 }
