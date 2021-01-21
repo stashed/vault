@@ -13,7 +13,7 @@ image:
   repository: stash-mysql
   # Tag of the image that is used to backup/restore MySQL database.
   # This is usually same as the database version it can backup.
-  tag: v2020.12.17
+  tag: v2021.01.21
 # optional argument to send mysqldump or mysql command
 backup:
   # Arguments to pass to `mysqldump` command  during bakcup process
