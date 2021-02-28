@@ -19,6 +19,8 @@ package pkg
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -38,14 +40,17 @@ import (
 	v1 "kmodules.xyz/offshoot-api/api/v1"
 )
 
+const (
+	MySQLTLSRootCA = "ca.crt"
+)
+
 func NewCmdBackup() *cobra.Command {
 	var (
 		masterURL      string
 		kubeconfigPath string
 		opt            = mysqlOptions{
 
-			myArgs:      "--all-databases",
-			waitTimeout: 300,
+			myArgs: "--all-databases",
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
 				EnableCache: false,
@@ -221,8 +226,20 @@ func (opt *mysqlOptions) backupMySQL(targetRef api_v1beta1.TargetRef) (*restic.B
 		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, arg)
 	}
 
+	// if ssl enabled, add ca.crt in the arguments
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, MySQLTLSRootCA), appBinding.Spec.ClientConfig.CABundle, os.ModePerm); err != nil {
+			return nil, err
+		}
+		tlsCreds := []interface{}{
+			fmt.Sprintf("--ssl-ca=%v", filepath.Join(opt.setupOptions.ScratchDir, MySQLTLSRootCA)),
+		}
+
+		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, tlsCreds...)
+	}
+
 	// wait for DB ready
-	err = waitForDBReady(appBinding, appBindingSecret, opt.waitTimeout)
+	err = opt.waitForDBReady(appBinding, appBindingSecret)
 	if err != nil {
 		return nil, err
 	}

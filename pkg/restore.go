@@ -19,6 +19,8 @@ package pkg
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -190,8 +192,20 @@ func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.
 		opt.dumpOptions.StdoutPipeCommand.Args = append(opt.dumpOptions.StdoutPipeCommand.Args, arg)
 	}
 
+	// if ssl enabled, add ca.crt in the arguments
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, MySQLTLSRootCA), appBinding.Spec.ClientConfig.CABundle, os.ModePerm); err != nil {
+			return nil, err
+		}
+		tlsCreds := []interface{}{
+			fmt.Sprintf("--ssl-ca=%v", filepath.Join(opt.setupOptions.ScratchDir, MySQLTLSRootCA)),
+		}
+
+		opt.dumpOptions.StdoutPipeCommand.Args = append(opt.dumpOptions.StdoutPipeCommand.Args, tlsCreds...)
+	}
+
 	// wait for DB ready
-	err = waitForDBReady(appBinding, appBindingSecret, opt.waitTimeout)
+	err = opt.waitForDBReady(appBinding, appBindingSecret)
 	if err != nil {
 		return nil, err
 	}

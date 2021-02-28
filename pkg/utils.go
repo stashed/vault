@@ -18,7 +18,7 @@ package pkg
 
 import (
 	"fmt"
-	"time"
+	"path/filepath"
 
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
 	"stash.appscode.dev/apimachinery/pkg/restic"
@@ -26,7 +26,6 @@ import (
 	"github.com/codeskyblue/go-sh"
 	"gomodules.xyz/x/log"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
@@ -58,7 +57,7 @@ type mysqlOptions struct {
 	dumpOptions   restic.DumpOptions
 }
 
-func waitForDBReady(appBinding *v1alpha1.AppBinding, secret *core.Secret, waitTimeout int32) error {
+func (opt *mysqlOptions) waitForDBReady(appBinding *v1alpha1.AppBinding, secret *core.Secret) error {
 	log.Infoln("Waiting for the database to be ready.....")
 	shell := sh.NewSession()
 	shell.SetEnv(EnvMySqlPassword, string(secret.Data[MySqlPassword]))
@@ -70,17 +69,14 @@ func waitForDBReady(appBinding *v1alpha1.AppBinding, secret *core.Secret, waitTi
 		args = append(args, fmt.Sprintf("--port=%d", appBinding.Spec.ClientConfig.Service.Port))
 	}
 
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		args = append(args, fmt.Sprintf("--ssl-ca=%v", filepath.Join(opt.setupOptions.ScratchDir, MySQLTLSRootCA)))
+	}
+
 	// Execute "SELECT 1" query to the database. It should return an error when mysqld is not ready.
 	args = append(args, "-e", "SELECT 1;")
 
 	// don't show the output of the query
 	shell.Stdout = nil
-	return wait.PollImmediate(5*time.Second, time.Duration(waitTimeout)*time.Second, func() (done bool, err error) {
-		if err := shell.Command("mysql", args...).Run(); err == nil {
-			log.Infoln("Database is accepting connection....")
-			return true, nil
-		}
-		log.Infoln("Retrying after 5 seconds....")
-		return false, nil
-	})
+	return shell.Command("mysql", args...).Run()
 }

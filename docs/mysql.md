@@ -54,7 +54,7 @@ Let's deploy a sample MySQL database and insert some data into it.
 Below is the YAML of a sample MySQL CRD that we are going to create for this tutorial:
 
 ```yaml
-apiVersion: kubedb.com/v1alpha1
+apiVersion: kubedb.com/v1alpha2
 kind: MySQL
 metadata:
   name: sample-mysql
@@ -166,16 +166,16 @@ The following YAML shows a minimal AppBinding specification that you have to cre
 apiVersion: appcatalog.appscode.com/v1alpha1
 kind: AppBinding
 metadata:
-  name: <my_custom_appbinding_name>
-  namespace: <my_database_namespace>
+  name: my-custom-appbinding-name
+  namespace: my-database-namespace
 spec:
   clientConfig:
     service:
-      name: <my_database_service_name>
-      port: <my_database_port_number>
+      name: my-database-service-name
+      port: 3306 # my_database_port_number
       scheme: mysql
   secret:
-    name: <my_database_credentials_secret_name>
+    name: my-database-credentials-secret-name
   # type field is optional. you can keep it empty.
   # if you keep it empty then the value of TARGET_APP_RESOURCE variable
   # will be set to "appbinding" during auto-backup.
@@ -439,15 +439,15 @@ Now, we have to deploy the restored database similarly as we have deployed the o
 Below is the YAML for `MySQL` CRD we are going deploy to initialize from backup,
 
 ```yaml
-apiVersion: kubedb.com/v1alpha1
+apiVersion: kubedb.com/v1alpha2
 kind: MySQL
 metadata:
   name: restored-mysql
   namespace: demo
 spec:
   version: "8.0.14"
-  databaseSecret:
-    secretName: sample-mysql-auth
+  authSecret:
+    name: sample-mysql-auth
   replicas: 1
   storageType: Durable
   storage:
@@ -456,9 +456,6 @@ spec:
     resources:
       requests:
         storage: 50Mi
-  init:
-    stashRestoreSession:
-      name: sample-mysql-restore
   terminationPolicy: WipeOut
 ```
 
