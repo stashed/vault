@@ -130,10 +130,7 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/instance: sample-mysql
     app.kubernetes.io/managed-by: kubedb.com
-    app.kubernetes.io/name: mysql
-    app.kubernetes.io/version: 8.0.14
-    kubedb.com/kind: MySQL
-    kubedb.com/name: sample-mysql
+    app.kubernetes.io/name: mysqls.kubedb.com
   name: sample-mysql
   namespace: demo
 spec:
@@ -456,12 +453,14 @@ spec:
     resources:
       requests:
         storage: 50Mi
+  init:
+    waitForInitialRestore: true
   terminationPolicy: WipeOut
 ```
 
 Here,
 
-- `spec.init.stashRestoreSession.name` specifies the `RestoreSession` CRD name that we will use later to restore the database.
+- `spec.init.waitForInitialRestore` tells KubeDB to wait for the first restore to complete before marking this database as ready to use.
 
 Let's create the above database,
 
@@ -501,7 +500,7 @@ metadata:
   name: sample-mysql-restore
   namespace: demo
   labels:
-    kubedb.com/kind: MySQL # this label is mandatory if you are using KubeDB to deploy the database.
+    app.kubernetes.io/name: mysqls.kubedb.com # this label is mandatory if you are using KubeDB to deploy the database.
 spec:
   task:
     name: mysql-restore-{{< param "info.subproject_version" >}}
@@ -518,13 +517,13 @@ spec:
 
 Here,
 
-- `.metadata.labels` specifies a `kubedb.com/kind: MySQL` label that is used by KubeDB to watch this RestoreSession object.
+- `.metadata.labels` specifies a `app.kubernetes.io/name: mysqls.kubedb.com` label that is used by KubeDB to watch this RestoreSession object.
 - `.spec.task.name` specifies the name of the Task CRD that specifies the necessary Functions and their execution order to restore a MySQL database.
 - `.spec.repository.name` specifies the Repository CRD that holds the backend information where our backed up data has been stored.
 - `.spec.target.ref` refers to the newly created AppBinding object for the `restored-mysql` MySQL object.
 - `.spec.rules` specifies that we are restoring data from the latest backup snapshot of the database.
 
-> **Warning:** Label `kubedb.com/kind: MySQL` is mandatory if you are using KubeDB to deploy the database. Otherwise, the database will be stuck in **`Initializing`** state.
+> **Warning:** Label `app.kubernetes.io/name: mysqls.kubedb.com` is mandatory if you are using KubeDB to deploy the database. Otherwise, the database will be stuck in **`Provisioning`** state.
 
 Let's create the RestoreSession CRD object we have shown above,
 

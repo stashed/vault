@@ -4,7 +4,7 @@ metadata:
   name: restore-sample-mysql
   namespace: demo
   labels:
-    kubedb.com/kind: MySQL # this label is mandatory if you are using KubeDB to deploy the database.
+    app.kubernetes.io/name: mysqls.kubedb.com # this label is mandatory if you are using KubeDB to deploy the database.
 spec:
   task:
     name: mysql-restore-v2021.01.21

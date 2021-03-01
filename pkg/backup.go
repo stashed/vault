@@ -211,7 +211,7 @@ func (opt *mysqlOptions) backupMySQL(targetRef api_v1beta1.TargetRef) (*restic.B
 	// set env for mysqldump
 	resticWrapper.SetEnv(EnvMySqlPassword, string(appBindingSecret.Data[MySqlPassword]))
 	// setup pipe command
-	opt.backupOptions.StdinPipeCommand = restic.Command{
+	backupCmd := restic.Command{
 		Name: MySqlDumpCMD,
 		Args: []interface{}{
 			"-u", string(appBindingSecret.Data[MySqlUser]),
@@ -220,10 +220,10 @@ func (opt *mysqlOptions) backupMySQL(targetRef api_v1beta1.TargetRef) (*restic.B
 	}
 	// if port is specified, append port in the arguments
 	if appBinding.Spec.ClientConfig.Service.Port != 0 {
-		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, fmt.Sprintf("--port=%d", appBinding.Spec.ClientConfig.Service.Port))
+		backupCmd.Args = append(backupCmd.Args, fmt.Sprintf("--port=%d", appBinding.Spec.ClientConfig.Service.Port))
 	}
 	for _, arg := range strings.Fields(opt.myArgs) {
-		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, arg)
+		backupCmd.Args = append(backupCmd.Args, arg)
 	}
 
 	// if ssl enabled, add ca.crt in the arguments
@@ -235,7 +235,7 @@ func (opt *mysqlOptions) backupMySQL(targetRef api_v1beta1.TargetRef) (*restic.B
 			fmt.Sprintf("--ssl-ca=%v", filepath.Join(opt.setupOptions.ScratchDir, MySQLTLSRootCA)),
 		}
 
-		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, tlsCreds...)
+		backupCmd.Args = append(backupCmd.Args, tlsCreds...)
 	}
 
 	// wait for DB ready
@@ -243,6 +243,9 @@ func (opt *mysqlOptions) backupMySQL(targetRef api_v1beta1.TargetRef) (*restic.B
 	if err != nil {
 		return nil, err
 	}
+
+	// add backup command in the pipeline
+	opt.backupOptions.StdinPipeCommands = append(opt.backupOptions.StdinPipeCommands, backupCmd)
 
 	// Run backup
 	return resticWrapper.RunBackup(opt.backupOptions, targetRef)

@@ -177,7 +177,7 @@ func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.
 	// set env for mysql
 	resticWrapper.SetEnv(EnvMySqlPassword, string(appBindingSecret.Data[MySqlPassword]))
 	// setup pipe command
-	opt.dumpOptions.StdoutPipeCommand = restic.Command{
+	restoreCmd := restic.Command{
 		Name: MySqlRestoreCMD,
 		Args: []interface{}{
 			"-u", string(appBindingSecret.Data[MySqlUser]),
@@ -186,10 +186,10 @@ func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.
 	}
 	// if port is specified, append port in the arguments
 	if appBinding.Spec.ClientConfig.Service.Port != 0 {
-		opt.dumpOptions.StdoutPipeCommand.Args = append(opt.dumpOptions.StdoutPipeCommand.Args, fmt.Sprintf("--port=%d", appBinding.Spec.ClientConfig.Service.Port))
+		restoreCmd.Args = append(restoreCmd.Args, fmt.Sprintf("--port=%d", appBinding.Spec.ClientConfig.Service.Port))
 	}
 	for _, arg := range strings.Fields(opt.myArgs) {
-		opt.dumpOptions.StdoutPipeCommand.Args = append(opt.dumpOptions.StdoutPipeCommand.Args, arg)
+		restoreCmd.Args = append(restoreCmd.Args, arg)
 	}
 
 	// if ssl enabled, add ca.crt in the arguments
@@ -201,7 +201,7 @@ func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.
 			fmt.Sprintf("--ssl-ca=%v", filepath.Join(opt.setupOptions.ScratchDir, MySQLTLSRootCA)),
 		}
 
-		opt.dumpOptions.StdoutPipeCommand.Args = append(opt.dumpOptions.StdoutPipeCommand.Args, tlsCreds...)
+		restoreCmd.Args = append(restoreCmd.Args, tlsCreds...)
 	}
 
 	// wait for DB ready
@@ -209,6 +209,9 @@ func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.
 	if err != nil {
 		return nil, err
 	}
+
+	// append the restore command to the pipeline
+	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, restoreCmd)
 
 	// Run dump
 	return resticWrapper.Dump(opt.dumpOptions, targetRef)
