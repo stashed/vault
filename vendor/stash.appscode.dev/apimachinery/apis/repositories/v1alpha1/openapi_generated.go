@@ -18028,6 +18028,19 @@ func schema_apimachinery_apis_repositories_v1alpha1_SnapshotStatus(ref common.Re
 							Format: "int32",
 						},
 					},
+					"tags": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 					"repository": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},

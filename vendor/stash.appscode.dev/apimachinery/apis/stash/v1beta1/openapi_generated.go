@@ -20327,8 +20327,9 @@ func schema_apimachinery_apis_stash_v1beta1_TaskRef(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "Name specifies the name of the Task to use for backup/restore purpose. If your database has been deployed with KubeDB, then keep this field empty. Stash will read the Task info from the respective AppBinding.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"params": {
@@ -20345,7 +20346,6 @@ func schema_apimachinery_apis_stash_v1beta1_TaskRef(ref common.ReferenceCallback
 						},
 					},
 				},
-				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
