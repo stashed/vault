@@ -24,9 +24,9 @@ import (
 	"stash.appscode.dev/apimachinery/pkg/restic"
 
 	"github.com/codeskyblue/go-sh"
-	"gomodules.xyz/x/log"
 	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 )
@@ -58,7 +58,7 @@ type mysqlOptions struct {
 }
 
 func (opt *mysqlOptions) waitForDBReady(appBinding *v1alpha1.AppBinding, secret *core.Secret) error {
-	log.Infoln("Waiting for the database to be ready.....")
+	klog.Infoln("Waiting for the database to be ready.....")
 	shell := sh.NewSession()
 	shell.SetEnv(EnvMySqlPassword, string(secret.Data[MySqlPassword]))
 	args := []interface{}{
