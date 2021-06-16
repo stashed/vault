@@ -19,12 +19,14 @@ package pkg
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
 	"stash.appscode.dev/apimachinery/pkg/restic"
 
 	"gomodules.xyz/go-sh"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
@@ -78,5 +80,13 @@ func (opt *mysqlOptions) waitForDBReady(appBinding *v1alpha1.AppBinding, secret 
 
 	// don't show the output of the query
 	shell.Stdout = nil
-	return shell.Command("mysql", args...).Run()
+
+	return wait.PollImmediate(5*time.Second, time.Duration(opt.waitTimeout)*time.Second, func() (done bool, err error) {
+		if err := shell.Command("mysql", args...).Run(); err == nil {
+			klog.Infoln("Database is accepting connection....")
+			return true, nil
+		}
+		klog.Infof("Unable to connect with the database. Reason: %v.\nRetrying after 5 seconds....", err)
+		return false, nil
+	})
 }
