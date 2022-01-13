@@ -11,13 +11,13 @@ require (
 	gomodules.xyz/go-sh v0.1.0
 	gomodules.xyz/logs v0.0.6
 	gomodules.xyz/x v0.0.8
-	k8s.io/api v0.21.1
 	k8s.io/apimachinery v0.21.1
 	k8s.io/client-go v0.21.1
 	k8s.io/klog/v2 v2.8.0
-	kmodules.xyz/custom-resources v0.0.0-20211122142737-3bf3dbd8ac52
+	kmodules.xyz/client-go v0.0.0-20220108081101-27afc2ac4ebe
+	kmodules.xyz/custom-resources v0.0.0-20220104123914-3c036dd7c1cd
 	kmodules.xyz/offshoot-api v0.0.0-20211103060642-3e217667cf41
-	stash.appscode.dev/apimachinery v0.17.0
+	stash.appscode.dev/apimachinery v0.17.1-0.20220113052814-7da4b19c88a3
 )
 
 replace bitbucket.org/ww/goautoneg => gomodules.xyz/goautoneg v0.0.0-20120707110453-a547fc61f48d

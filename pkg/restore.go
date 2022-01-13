@@ -1,12 +1,9 @@
 /*
 Copyright AppsCode Inc. and Contributors
-
 Licensed under the AppsCode Free Trial License 1.0.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     https://github.com/appscode/licenses/raw/1.0.0/AppsCode-Free-Trial-1.0.0.md
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,11 +15,7 @@ package pkg
 
 import (
 	"context"
-	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
-	"strings"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	"stash.appscode.dev/apimachinery/pkg/restic"
@@ -60,7 +53,7 @@ func NewCmdRestore() *cobra.Command {
 		Short:             "Restores MySQL DB Backup",
 		DisableAutoGenTag: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			flags.EnsureRequiredFlags(cmd, "appbinding", "provider", "secret-dir")
+			flags.EnsureRequiredFlags(cmd, "appbinding", "provider", "storage-secret-name", "storage-secret-namespace")
 
 			// prepare client
 			config, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfigPath)
@@ -118,13 +111,14 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", kubeconfigPath, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	cmd.Flags().StringVar(&opt.namespace, "namespace", "default", "Namespace of Backup/Restore Session")
 	cmd.Flags().StringVar(&opt.appBindingName, "appbinding", opt.appBindingName, "Name of the app binding")
-
 	cmd.Flags().StringVar(&opt.setupOptions.Provider, "provider", opt.setupOptions.Provider, "Backend provider (i.e. gcs, s3, azure etc)")
 	cmd.Flags().StringVar(&opt.setupOptions.Bucket, "bucket", opt.setupOptions.Bucket, "Name of the cloud bucket/container (keep empty for local backend)")
 	cmd.Flags().StringVar(&opt.setupOptions.Endpoint, "endpoint", opt.setupOptions.Endpoint, "Endpoint for s3/s3 compatible backend or REST backend URL")
 	cmd.Flags().StringVar(&opt.setupOptions.Region, "region", opt.setupOptions.Region, "Region for s3/s3 compatible backend")
 	cmd.Flags().StringVar(&opt.setupOptions.Path, "path", opt.setupOptions.Path, "Directory inside the bucket where backup will be stored")
-	cmd.Flags().StringVar(&opt.setupOptions.SecretDir, "secret-dir", opt.setupOptions.SecretDir, "Directory where storage secret has been mounted")
+	cmd.Flags().StringVar(&opt.storageSecret.Name, "storage-secret-name", opt.storageSecret.Name, "Name of the storage secret")
+	cmd.Flags().StringVar(&opt.storageSecret.Namespace, "storage-secret-namespace", opt.storageSecret.Namespace, "Namespace of the storage secret")
+
 	cmd.Flags().StringVar(&opt.setupOptions.ScratchDir, "scratch-dir", opt.setupOptions.ScratchDir, "Temporary directory")
 	cmd.Flags().BoolVar(&opt.setupOptions.EnableCache, "enable-cache", opt.setupOptions.EnableCache, "Specify whether to enable caching for restic")
 	cmd.Flags().Int64Var(&opt.setupOptions.MaxConnections, "max-connections", opt.setupOptions.MaxConnections, "Specify maximum concurrent connections for GCS, Azure and B2 backend")
@@ -140,8 +134,14 @@ func NewCmdRestore() *cobra.Command {
 }
 
 func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.RestoreOutput, error) {
-	// apply nice, ionice settings from env
+
 	var err error
+	opt.setupOptions.StorageSecret, err = opt.kubeClient.CoreV1().Secrets(opt.storageSecret.Namespace).Get(context.TODO(), opt.storageSecret.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// apply nice, ionice settings from env
 	opt.setupOptions.Nice, err = v1.NiceSettingsFromEnv()
 	if err != nil {
 		return nil, err
@@ -151,68 +151,40 @@ func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	// get app binding
 	appBinding, err := opt.catalogClient.AppcatalogV1alpha1().AppBindings(opt.namespace).Get(context.TODO(), opt.appBindingName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
-	// get secret
-	appBindingSecret, err := opt.kubeClient.CoreV1().Secrets(opt.namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
+
+	session := opt.newSessionWrapper(MySqlRestoreCMD)
+
+	err = session.setDatabaseCredentials(opt.kubeClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	// transform secret
-	err = appBinding.TransformSecret(opt.kubeClient, appBindingSecret.Data)
+	err = session.setDatabaseConnectionParameters(appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	// init restic wrapper
-	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
+	err = session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir)
 	if err != nil {
 		return nil, err
 	}
 
-	// set env for mysql
-	resticWrapper.SetEnv(EnvMySqlPassword, string(appBindingSecret.Data[MySqlPassword]))
-	// setup pipe command
-	restoreCmd := restic.Command{
-		Name: MySqlRestoreCMD,
-		Args: []interface{}{
-			"-u", string(appBindingSecret.Data[MySqlUser]),
-			"-h", appBinding.Spec.ClientConfig.Service.Name,
-		},
-	}
-	// if port is specified, append port in the arguments
-	if appBinding.Spec.ClientConfig.Service.Port != 0 {
-		restoreCmd.Args = append(restoreCmd.Args, fmt.Sprintf("--port=%d", appBinding.Spec.ClientConfig.Service.Port))
-	}
-	for _, arg := range strings.Fields(opt.myArgs) {
-		restoreCmd.Args = append(restoreCmd.Args, arg)
-	}
-
-	// if ssl enabled, add ca.crt in the arguments
-	if appBinding.Spec.ClientConfig.CABundle != nil {
-		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, MySQLTLSRootCA), appBinding.Spec.ClientConfig.CABundle, os.ModePerm); err != nil {
-			return nil, err
-		}
-		tlsCreds := []interface{}{
-			fmt.Sprintf("--ssl-ca=%v", filepath.Join(opt.setupOptions.ScratchDir, MySQLTLSRootCA)),
-		}
-
-		restoreCmd.Args = append(restoreCmd.Args, tlsCreds...)
-	}
-
-	// wait for DB ready
-	err = opt.waitForDBReady(appBinding, appBindingSecret)
+	err = session.waitForDBReady(opt.waitTimeout)
 	if err != nil {
 		return nil, err
 	}
+
+	session.setUserArgs(opt.myArgs)
 
 	// append the restore command to the pipeline
-	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, restoreCmd)
-
-	// Run dump
+	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, *session.cmd)
+	resticWrapper, err := restic.NewResticWrapperFromShell(opt.setupOptions, session.sh)
+	if err != nil {
+		return nil, err
+	}
 	return resticWrapper.Dump(opt.dumpOptions, targetRef)
 }
