@@ -134,7 +134,6 @@ func NewCmdRestore() *cobra.Command {
 }
 
 func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.RestoreOutput, error) {
-
 	var err error
 	opt.setupOptions.StorageSecret, err = opt.kubeClient.CoreV1().Secrets(opt.storageSecret.Namespace).Get(context.TODO(), opt.storageSecret.Name, metav1.GetOptions{})
 	if err != nil {

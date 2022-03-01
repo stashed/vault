@@ -45,7 +45,6 @@ func NewCmdBackup() *cobra.Command {
 		masterURL      string
 		kubeconfigPath string
 		opt            = mysqlOptions{
-
 			myArgs: "--all-databases",
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
@@ -113,7 +112,6 @@ func NewCmdBackup() *cobra.Command {
 			}
 
 			return nil
-
 		},
 	}
 
@@ -155,7 +153,6 @@ func NewCmdBackup() *cobra.Command {
 }
 
 func (opt *mysqlOptions) backupMySQL(targetRef api_v1beta1.TargetRef) (*restic.BackupOutput, error) {
-
 	var err error
 	opt.setupOptions.StorageSecret, err = opt.kubeClient.CoreV1().Secrets(opt.storageSecret.Namespace).Get(context.TODO(), opt.storageSecret.Name, metav1.GetOptions{})
 	if err != nil {
