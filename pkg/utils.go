@@ -19,7 +19,6 @@ package pkg
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -125,7 +124,7 @@ func (session *sessionWrapper) setUserArgs(args string) {
 func (session *sessionWrapper) setTLSParameters(appBinding *appcatalog.AppBinding, scratchDir string) error {
 	// if ssl enabled, add ca.crt in the arguments
 	if appBinding.Spec.ClientConfig.CABundle != nil {
-		if err := ioutil.WriteFile(filepath.Join(scratchDir, MySQLTLSRootCA), appBinding.Spec.ClientConfig.CABundle, os.ModePerm); err != nil {
+		if err := os.WriteFile(filepath.Join(scratchDir, MySQLTLSRootCA), appBinding.Spec.ClientConfig.CABundle, os.ModePerm); err != nil {
 			return err
 		}
 		tlsCreds := []interface{}{
