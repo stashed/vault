@@ -52,7 +52,7 @@ func NewCmdBackup() *cobra.Command {
 			},
 			backupOptions: restic.BackupOptions{
 				Host:          restic.DefaultHost,
-				StdinFileName: MySqlDumpFile,
+				StdinFileName: VaultDumpFile,
 			},
 		}
 	)
@@ -197,7 +197,7 @@ func (opt *vaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
-	session := opt.newSessionWrapper(MySqlDumpCMD)
+	session := opt.newSessionWrapper(VaultDumpCMD)
 
 	err = session.setDatabaseCredentials(opt.kubeClient, appBinding)
 	if err != nil {
