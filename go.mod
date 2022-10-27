@@ -1,4 +1,4 @@
-module stash.appscode.dev/mysql
+module stash.appscode.dev/vault
 
 go 1.18
 

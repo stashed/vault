@@ -30,9 +30,9 @@ var licenseApiService string
 
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:               "stash-mysql",
-		Short:             `MySQL backup & restore plugin for Stash by AppsCode`,
-		Long:              `MySQL backup & restore plugin for Stash by AppsCode. For more information, visit here: https://appscode.com/products/stash`,
+		Use:               "stash-vault",
+		Short:             `Vault backup & restore plugin for Stash by AppsCode`,
+		Long:              `Vault backup & restore plugin for Stash by AppsCode. For more information, visit here: https://appscode.com/products/stash`,
 		DisableAutoGenTag: true,
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 			return scheme.AddToScheme(clientsetscheme.Scheme)

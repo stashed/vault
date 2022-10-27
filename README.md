@@ -1,12 +1,12 @@
-[![Go Report Card](https://goreportcard.com/badge/stash.appscode.dev/mysql)](https://goreportcard.com/report/stash.appscode.dev/mysql)
-![CI](https://github.com/stashed/mysql/workflows/CI/badge.svg)
-[![Docker Pulls](https://img.shields.io/docker/pulls/stashed/stash-mysql.svg)](https://hub.docker.com/r/stashed/stash-mysql/)
+[![Go Report Card](https://goreportcard.com/badge/stash.appscode.dev/vault)](https://goreportcard.com/report/stash.appscode.dev/vault)
+![CI](https://github.com/stashed/vault/workflows/CI/badge.svg)
+[![Docker Pulls](https://img.shields.io/docker/pulls/stashed/stash-vault.svg)](https://hub.docker.com/r/stashed/stash-vault/)
 [![Slack](https://shields.io/badge/Join_Slack-salck?color=4A154B&logo=slack)](https://slack.appscode.com)
 [![Twitter](https://img.shields.io/twitter/follow/kubestash.svg?style=social&logo=twitter&label=Follow)](https://twitter.com/intent/follow?screen_name=KubeStash)
 
-# MySQL
+# Vault
 
-MySQL backup and restore plugin for [Stash by AppsCode](https://stash.run).
+Vault backup and restore plugin for [Stash by AppsCode](https://stash.run).
 
 ## Support
 

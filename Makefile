@@ -16,7 +16,7 @@ SHELL=/bin/bash -o pipefail
 
 GO_PKG   := stash.appscode.dev
 REPO     := $(notdir $(shell pwd))
-BIN      := stash-mysql
+BIN      := stash-vault
 COMPRESS ?= no
 
 # Where to push the docker image.
@@ -58,8 +58,8 @@ BIN_PLATFORMS    := $(DOCKER_PLATFORMS)
 OS   := $(if $(GOOS),$(GOOS),$(shell go env GOOS))
 ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
-BASEIMAGE_PROD   ?= mysql:8.0.21
-BASEIMAGE_DBG    ?= mysql:8.0.21
+BASEIMAGE_PROD   ?= vault:1.12.0
+BASEIMAGE_DBG    ?= vault:1.12.0
 
 IMAGE            := $(REGISTRY)/$(BIN)
 VERSION_PROD     := $(VERSION)
@@ -367,5 +367,5 @@ clean:
 .PHONY: push-to-kind
 push-to-kind: container
 	@echo "Loading docker image into kind cluster...."
-	@kind load docker-image $(REGISTRY)/stash-mysql:$(TAG)
+	@kind load docker-image $(REGISTRY)/stash-vault:$(TAG)
 	@echo "Image has been pushed successfully into kind cluster."

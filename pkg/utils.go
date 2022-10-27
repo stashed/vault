@@ -39,15 +39,15 @@ import (
 )
 
 const (
-	MySqlUser        = "username"
-	MySqlPassword    = "password"
-	MySqlDumpFile    = "dumpfile.sql"
-	MySqlDumpCMD     = "mysqldump"
-	MySqlRestoreCMD  = "mysql"
-	EnvMySqlPassword = "MYSQL_PWD"
+	VaultUser        = "username"
+	VaultPassword    = "password"
+	VaultDumpFile    = "dumpfile.sql"
+	VaultDumpCMD     = "vaultdump"
+	VaultRestoreCMD  = "vault"
+	EnvVaultPassword = "Vault_PWD"
 )
 
-type mysqlOptions struct {
+type vaultOptions struct {
 	kubeClient    kubernetes.Interface
 	stashClient   stash.Interface
 	catalogClient appcatalog_cs.Interface
@@ -56,7 +56,7 @@ type mysqlOptions struct {
 	backupSessionName   string
 	appBindingName      string
 	appBindingNamespace string
-	myArgs              string
+	vaultArgs           string
 	waitTimeout         int32
 	outputDir           string
 	storageSecret       kmapi.ObjectReference
@@ -72,7 +72,7 @@ type sessionWrapper struct {
 	cmd *restic.Command
 }
 
-func (opt *mysqlOptions) newSessionWrapper(cmd string) *sessionWrapper {
+func (opt *vaultOptions) newSessionWrapper(cmd string) *sessionWrapper {
 	return &sessionWrapper{
 		sh: shell.NewSession(),
 		cmd: &restic.Command{
@@ -92,8 +92,8 @@ func (session *sessionWrapper) setDatabaseCredentials(kubeClient kubernetes.Inte
 		return err
 	}
 
-	session.cmd.Args = append(session.cmd.Args, "-u", string(appBindingSecret.Data[MySqlUser]))
-	session.sh.SetEnv(EnvMySqlPassword, string(appBindingSecret.Data[MySqlPassword]))
+	session.cmd.Args = append(session.cmd.Args, "-u", string(appBindingSecret.Data[VaultUser]))
+	session.sh.SetEnv(EnvVaultPassword, string(appBindingSecret.Data[VaultPassword]))
 	return nil
 }
 
@@ -124,11 +124,11 @@ func (session *sessionWrapper) setUserArgs(args string) {
 func (session *sessionWrapper) setTLSParameters(appBinding *appcatalog.AppBinding, scratchDir string) error {
 	// if ssl enabled, add ca.crt in the arguments
 	if appBinding.Spec.ClientConfig.CABundle != nil {
-		if err := os.WriteFile(filepath.Join(scratchDir, MySQLTLSRootCA), appBinding.Spec.ClientConfig.CABundle, os.ModePerm); err != nil {
+		if err := os.WriteFile(filepath.Join(scratchDir, VaultTLSRootCA), appBinding.Spec.ClientConfig.CABundle, os.ModePerm); err != nil {
 			return err
 		}
 		tlsCreds := []interface{}{
-			fmt.Sprintf("--ssl-ca=%v", filepath.Join(scratchDir, MySQLTLSRootCA)),
+			fmt.Sprintf("--ssl-ca=%v", filepath.Join(scratchDir, VaultTLSRootCA)),
 		}
 		session.cmd.Args = append(session.cmd.Args, tlsCreds)
 	}
@@ -143,14 +143,14 @@ func (session sessionWrapper) waitForDBReady(waitTimeout int32) error {
 		sh.SetEnv(k, v)
 	}
 
-	// Execute "SELECT 1" query to the database. It should return an error when mysqld is not ready.
+	// Execute "SELECT 1" query to the database. It should return an error when vaultd is not ready.
 	args := append(session.cmd.Args, "-e", "SELECT 1;")
 
 	// don't show the output of the query
 	sh.Stdout = nil
 
 	return wait.PollImmediate(5*time.Second, time.Duration(waitTimeout)*time.Second, func() (done bool, err error) {
-		if err := sh.Command("mysql", args...).Run(); err == nil {
+		if err := sh.Command("vault", args...).Run(); err == nil {
 			klog.Infoln("Database is accepting connection....")
 			return true, nil
 		}

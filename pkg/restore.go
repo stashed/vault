@@ -35,7 +35,7 @@ func NewCmdRestore() *cobra.Command {
 	var (
 		masterURL      string
 		kubeconfigPath string
-		opt            = mysqlOptions{
+		opt            = vaultOptions{
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
 				EnableCache: false,
@@ -49,8 +49,8 @@ func NewCmdRestore() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:               "restore-mysql",
-		Short:             "Restores MySQL DB Backup",
+		Use:               "restore-vault",
+		Short:             "Restores Vault Backup",
 		DisableAutoGenTag: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags.EnsureRequiredFlags(cmd, "appbinding", "provider", "storage-secret-name", "storage-secret-namespace")
@@ -79,7 +79,7 @@ func NewCmdRestore() *cobra.Command {
 			}
 
 			var restoreOutput *restic.RestoreOutput
-			restoreOutput, err = opt.restoreMySQL(targetRef)
+			restoreOutput, err = opt.restoreVault(targetRef)
 			if err != nil {
 				restoreOutput = &restic.RestoreOutput{
 					RestoreTargetStatus: api_v1beta1.RestoreMemberStatus{
@@ -103,7 +103,7 @@ func NewCmdRestore() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&opt.myArgs, "mysql-args", opt.myArgs, "Additional arguments")
+	cmd.Flags().StringVar(&opt.vaultArgs, "vault-args", opt.vaultArgs, "Additional arguments")
 	cmd.Flags().Int32Var(&opt.waitTimeout, "wait-timeout", opt.waitTimeout, "Time limit to wait for the database to be ready")
 
 	cmd.Flags().StringVar(&masterURL, "master", masterURL, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
@@ -133,7 +133,7 @@ func NewCmdRestore() *cobra.Command {
 	return cmd
 }
 
-func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.RestoreOutput, error) {
+func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.RestoreOutput, error) {
 	var err error
 
 	err = license.CheckLicenseEndpoint(opt.config, licenseApiService, SupportedProducts)
@@ -183,7 +183,7 @@ func (opt *mysqlOptions) restoreMySQL(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	session.setUserArgs(opt.myArgs)
+	session.setUserArgs(opt.vaultArgs)
 
 	// append the restore command to the pipeline
 	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, *session.cmd)
