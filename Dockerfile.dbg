@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:bullseye
-
-ENV DEBIAN_FRONTEND noninteractive
-ENV DEBCONF_NONINTERACTIVE_SEEN true
+FROM alpine:3.15
 
 RUN set -x \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends apt-transport-https ca-certificates curl bzip2
+  && apk update \
+  && apk add ca-certificates curl bzip2
 
 RUN set -x                                                                                                                                 \
   && curl -fsSL -o restic.bz2 https://github.com/restic/restic/releases/download/v{RESTIC_VER}/restic_{RESTIC_VER}_{ARG_OS}_{ARG_ARCH}.bz2 \
@@ -32,15 +29,9 @@ FROM {ARG_FROM}
 
 LABEL org.opencontainers.image.source https://github.com/stashed/vault
 
-ENV DEBIAN_FRONTEND noninteractive
-ENV DEBCONF_NONINTERACTIVE_SEEN true
-
 RUN set -x \
-  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 467B942D3A79BD29
-
-RUN set -x \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates \
+  && apk update \
+  && apk add ca-certificates \
   && rm -rf /var/lib/apt/lists/* /usr/share/doc /usr/share/man /tmp/*
 
 COPY --from=0 restic /bin/restic
