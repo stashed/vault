@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
@@ -222,11 +221,6 @@ func (opt *vaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 	err = session.waitForVaultReady(vaultClient, opt.waitTimeout)
 	if err != nil {
 		return nil, err
-	}
-
-	klog.Infoln("=====================> env set <==================")
-	for k, v := range session.sh.Env {
-		klog.Infoln("k, v: ", k, v)
 	}
 
 	err = opt.saveVaultSnapshot(session)

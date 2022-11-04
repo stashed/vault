@@ -101,6 +101,24 @@ type vaultOptions struct {
 	config         *restclient.Config
 
 	interimDataDir string
+
+	force bool
+
+	OldUnsealMode          string
+	OldKmsCryptoKey        string
+	OldKmsKeyRing          string
+	OldKmsLocation         string
+	OldKmsProject          string
+	OldBucket              string
+	OldCredentialSecretRef string
+
+	NewUnsealMode          string
+	NewKmsCryptoKey        string
+	NewKmsKeyRing          string
+	NewKmsLocation         string
+	NewKmsProject          string
+	NewBucket              string
+	NewCredentialSecretRef string
 }
 
 type sessionWrapper struct {

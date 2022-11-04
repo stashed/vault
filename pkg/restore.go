@@ -19,6 +19,7 @@ import (
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	"stash.appscode.dev/apimachinery/pkg/restic"
+	token_keys_store "stash.appscode.dev/vault/pkg/token-keys-store"
 
 	"github.com/spf13/cobra"
 	license "go.bytebuilders.dev/license-verifier/kubernetes"
@@ -131,6 +132,24 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().StringVar(&opt.interimDataDir, "interim-data-dir", opt.interimDataDir, "Directory where the restored data will be stored temporarily before injecting into the desired NATS Server")
 	cmd.Flags().StringVar(&opt.outputDir, "output-dir", opt.outputDir, "Directory where output.json file will be written (keep empty if you don't need to write output in file)")
 
+	cmd.Flags().BoolVar(&opt.force, "force", opt.force, "Specify whether to force restore or not")
+
+	cmd.Flags().StringVar(&opt.OldUnsealMode, "old-unseal-mode", opt.OldUnsealMode, "specifies the mode of storing old token & unseal keys")
+	cmd.Flags().StringVar(&opt.OldKmsCryptoKey, "old-kms-crypto-key", opt.OldKmsCryptoKey, "crypto key")
+	cmd.Flags().StringVar(&opt.OldKmsKeyRing, "old-kms-key-ring", opt.OldKmsKeyRing, "key ring")
+	cmd.Flags().StringVar(&opt.OldKmsLocation, "old-kms-location", opt.OldKmsKeyRing, "key ring")
+	cmd.Flags().StringVar(&opt.OldKmsProject, "old-kms-project", opt.OldKmsKeyRing, "kms project")
+	cmd.Flags().StringVar(&opt.OldBucket, "old-bucket", opt.OldKmsKeyRing, "bucket")
+	cmd.Flags().StringVar(&opt.OldCredentialSecretRef, "old-credential-secret-ref", opt.OldKmsKeyRing, "credential secret")
+
+	cmd.Flags().StringVar(&opt.NewUnsealMode, "new-unseal-mode", opt.NewUnsealMode, "specifies the mode of storing new token & unseal keys")
+	cmd.Flags().StringVar(&opt.NewKmsCryptoKey, "new-kms-crypto-key", opt.NewKmsCryptoKey, "crypto key")
+	cmd.Flags().StringVar(&opt.NewKmsLocation, "new-kms-location", opt.NewKmsLocation, "key ring")
+	cmd.Flags().StringVar(&opt.NewKmsKeyRing, "new-kms-key-ring", opt.NewKmsKeyRing, "kms location")
+	cmd.Flags().StringVar(&opt.NewKmsProject, "new-kms-project", opt.NewKmsProject, "kms project")
+	cmd.Flags().StringVar(&opt.NewBucket, "new-bucket", opt.NewBucket, "bucket")
+	cmd.Flags().StringVar(&opt.NewCredentialSecretRef, "new-credential-secret-ref", opt.NewCredentialSecretRef, "credential secret")
+
 	return cmd
 }
 
@@ -193,9 +212,9 @@ func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	klog.Infoln("=====================> env set <==================")
-	for k, v := range session.sh.Env {
-		klog.Infoln("k, v: ", k, v)
+	err = opt.migrateTokenKeys()
+	if err != nil {
+		return nil, err
 	}
 
 	opt.restoreOptions.RestorePaths = []string{opt.interimDataDir}
@@ -220,9 +239,13 @@ func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 
 func (opt *vaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 	session.cmd.Args = append(session.cmd.Args, "operator", "raft", "snapshot", "restore")
+
 	// -force is required for different vault cluster snapshot restoration
 	// although, -force restore doesn't make any difference for same vault cluster
-	session.cmd.Args = append(session.cmd.Args, "-force")
+	if opt.force {
+		session.cmd.Args = append(session.cmd.Args, "-force")
+	}
+
 	session.cmd.Args = append(session.cmd.Args, filepath.Join(opt.interimDataDir, VaultSnapshotFile))
 
 	session.sh.ShowCMD = true
@@ -233,5 +256,21 @@ func (opt *vaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 		return err
 	}
 
+	return nil
+}
+
+func (opt *vaultOptions) migrateTokenKeys() error {
+	src, err := token_keys_store.NewTokenKeysInterface(opt.OldUnsealMode, opt.kubeClient)
+	if err != nil {
+		return err
+	}
+
+	dst, err := token_keys_store.NewTokenKeysInterface(opt.NewUnsealMode, opt.kubeClient)
+	if err != nil {
+		return err
+	}
+
+	// migrate from src to dst
+	klog.Infoln(src.TokenName(), dst.TokenName())
 	return nil
 }
