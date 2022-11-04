@@ -31,13 +31,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
-)
-
-const (
-	VaultTLSRootCA = "ca.crt"
 )
 
 func NewCmdBackup() *cobra.Command {
@@ -45,14 +42,12 @@ func NewCmdBackup() *cobra.Command {
 		masterURL      string
 		kubeconfigPath string
 		opt            = vaultOptions{
-			vaultArgs: "--all-databases",
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
 				EnableCache: false,
 			},
 			backupOptions: restic.BackupOptions{
-				Host:          restic.DefaultHost,
-				StdinFileName: VaultDumpFile,
+				Host: restic.DefaultHost,
 			},
 		}
 	)
@@ -147,6 +142,7 @@ func NewCmdBackup() *cobra.Command {
 	cmd.Flags().BoolVar(&opt.backupOptions.RetentionPolicy.DryRun, "retention-dry-run", opt.backupOptions.RetentionPolicy.DryRun, "Specify whether to test retention policy without deleting actual data")
 
 	cmd.Flags().StringVar(&opt.outputDir, "output-dir", opt.outputDir, "Directory where output.json file will be written (keep empty if you don't need to write output in file)")
+	cmd.Flags().StringVar(&opt.interimDataDir, "interim-data-dir", opt.interimDataDir, "Directory where the targeted data will be stored temporarily before uploading to the backend")
 
 	return cmd
 }
@@ -197,14 +193,23 @@ func (opt *vaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
-	session := opt.newSessionWrapper(VaultDumpCMD)
+	if err = clearDir(opt.interimDataDir); err != nil {
+		return nil, err
+	}
 
-	err = session.setDatabaseCredentials(opt.kubeClient, appBinding)
+	session := opt.newSessionWrapper(VaultCMD)
+
+	vaultClient, err := newVaultClient(appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	err = session.setDatabaseConnectionParameters(appBinding)
+	err = session.setVaultToken(opt.kubeClient, appBinding)
+	if err != nil {
+		return nil, err
+	}
+
+	err = session.setVaultConnectionParameters(vaultClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
@@ -214,19 +219,40 @@ func (opt *vaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
-	err = session.waitForDBReady(opt.waitTimeout)
+	err = session.waitForVaultReady(vaultClient, opt.waitTimeout)
 	if err != nil {
 		return nil, err
 	}
 
-	session.setUserArgs(opt.vaultArgs)
+	klog.Infoln("=====================> env set <==================")
+	for k, v := range session.sh.Env {
+		klog.Infoln("k, v: ", k, v)
+	}
 
-	// add backup command in the pipeline
-	opt.backupOptions.StdinPipeCommands = append(opt.backupOptions.StdinPipeCommands, *session.cmd)
-	resticWrapper, err := restic.NewResticWrapperFromShell(opt.setupOptions, session.sh)
+	err = opt.saveVaultSnapshot(session)
+	if err != nil {
+		return nil, err
+	}
+
+	opt.backupOptions.BackupPaths = []string{opt.interimDataDir}
+	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	return resticWrapper.RunBackup(opt.backupOptions, targetRef)
+}
+
+func (opt *vaultOptions) saveVaultSnapshot(session *sessionWrapper) error {
+	session.cmd.Args = append(session.cmd.Args, "operator", "raft", "snapshot", "save", filepath.Join(opt.interimDataDir, VaultSnapshotFile))
+
+	session.sh.ShowCMD = true
+	session.setUserArgs(opt.vaultArgs)
+	session.sh.Command(VaultCMD, session.cmd.Args...)
+
+	if err := session.sh.Run(); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
@@ -35,15 +36,15 @@ func NewCmdRestore() *cobra.Command {
 	var (
 		masterURL      string
 		kubeconfigPath string
-		opt            = vaultOptions{
+
+		opt = vaultOptions{
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
 				EnableCache: false,
 			},
 			waitTimeout: 300,
-			dumpOptions: restic.DumpOptions{
-				Host:     restic.DefaultHost,
-				FileName: VaultDumpFile,
+			restoreOptions: restic.RestoreOptions{
+				Host: restic.DefaultHost,
 			},
 		}
 	)
@@ -86,7 +87,7 @@ func NewCmdRestore() *cobra.Command {
 						Ref: targetRef,
 						Stats: []api_v1beta1.HostRestoreStats{
 							{
-								Hostname: opt.dumpOptions.Host,
+								Hostname: opt.restoreOptions.Host,
 								Phase:    api_v1beta1.HostRestoreFailed,
 								Error:    err.Error(),
 							},
@@ -123,11 +124,11 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().BoolVar(&opt.setupOptions.EnableCache, "enable-cache", opt.setupOptions.EnableCache, "Specify whether to enable caching for restic")
 	cmd.Flags().Int64Var(&opt.setupOptions.MaxConnections, "max-connections", opt.setupOptions.MaxConnections, "Specify maximum concurrent connections for GCS, Azure and B2 backend")
 
-	cmd.Flags().StringVar(&opt.dumpOptions.Host, "hostname", opt.dumpOptions.Host, "Name of the host machine")
-	cmd.Flags().StringVar(&opt.dumpOptions.SourceHost, "source-hostname", opt.dumpOptions.SourceHost, "Name of the host from where data will be restored")
-	// TODO: sliceVar
-	cmd.Flags().StringVar(&opt.dumpOptions.Snapshot, "snapshot", opt.dumpOptions.Snapshot, "Snapshot to dump")
+	cmd.Flags().StringVar(&opt.restoreOptions.Host, "hostname", opt.restoreOptions.Host, "Name of the host machine")
+	cmd.Flags().StringVar(&opt.restoreOptions.SourceHost, "source-hostname", opt.restoreOptions.SourceHost, "Name of the host from where data will be restored")
+	cmd.Flags().StringSliceVar(&opt.restoreOptions.Snapshots, "snapshot", opt.restoreOptions.Snapshots, "Snapshot to restore")
 
+	cmd.Flags().StringVar(&opt.interimDataDir, "interim-data-dir", opt.interimDataDir, "Directory where the restored data will be stored temporarily before injecting into the desired NATS Server")
 	cmd.Flags().StringVar(&opt.outputDir, "output-dir", opt.outputDir, "Directory where output.json file will be written (keep empty if you don't need to write output in file)")
 
 	return cmd
@@ -161,14 +162,23 @@ func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	session := opt.newSessionWrapper(VaultRestoreCMD)
+	if err = clearDir(opt.interimDataDir); err != nil {
+		return nil, err
+	}
 
-	err = session.setDatabaseCredentials(opt.kubeClient, appBinding)
+	session := opt.newSessionWrapper(VaultCMD)
+
+	vaultClient, err := newVaultClient(appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	err = session.setDatabaseConnectionParameters(appBinding)
+	err = session.setVaultToken(opt.kubeClient, appBinding)
+	if err != nil {
+		return nil, err
+	}
+
+	err = session.setVaultConnectionParameters(vaultClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
@@ -178,18 +188,50 @@ func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	err = session.waitForDBReady(opt.waitTimeout)
+	err = session.waitForVaultReady(vaultClient, opt.waitTimeout)
 	if err != nil {
 		return nil, err
 	}
 
+	klog.Infoln("=====================> env set <==================")
+	for k, v := range session.sh.Env {
+		klog.Infoln("k, v: ", k, v)
+	}
+
+	opt.restoreOptions.RestorePaths = []string{opt.interimDataDir}
+
+	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	restoreOutput, err := resticWrapper.RunRestore(opt.restoreOptions, targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	err = opt.restoreVaultSnapshot(session)
+	if err != nil {
+		return nil, err
+	}
+
+	return restoreOutput, nil
+}
+
+func (opt *vaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
+	session.cmd.Args = append(session.cmd.Args, "operator", "raft", "snapshot", "restore")
+	// -force is required for different vault cluster snapshot restoration
+	// although, -force restore doesn't make any difference for same vault cluster
+	session.cmd.Args = append(session.cmd.Args, "-force")
+	session.cmd.Args = append(session.cmd.Args, filepath.Join(opt.interimDataDir, VaultSnapshotFile))
+
+	session.sh.ShowCMD = true
 	session.setUserArgs(opt.vaultArgs)
+	session.sh.Command(VaultCMD, session.cmd.Args...)
 
-	// append the restore command to the pipeline
-	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, *session.cmd)
-	resticWrapper, err := restic.NewResticWrapperFromShell(opt.setupOptions, session.sh)
-	if err != nil {
-		return nil, err
+	if err := session.sh.Run(); err != nil {
+		return err
 	}
-	return resticWrapper.Dump(opt.dumpOptions, targetRef)
+
+	return nil
 }
