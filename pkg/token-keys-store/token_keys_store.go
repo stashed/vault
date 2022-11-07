@@ -19,16 +19,24 @@ package token_keys_store
 import (
 	"errors"
 
+	"stash.appscode.dev/vault/pkg"
 	"stash.appscode.dev/vault/pkg/token-keys-store/api"
 	gcs "stash.appscode.dev/vault/pkg/token-keys-store/google-kms-gcs"
-
-	"k8s.io/client-go/kubernetes"
 )
 
-func NewTokenKeysInterface(mode string, kubeClient kubernetes.Interface) (api.TokenKeyInterface, error) {
+func OldTokenKeysInterface(mode string, opt *pkg.VaultOptions) (api.TokenKeyInterface, error) {
 	switch {
 	case mode == "googleKmsGcs":
-		return gcs.New(kubeClient)
+		return gcs.Old(opt)
+	}
+
+	return nil, errors.New("unknown/unsupported unsealing mode")
+}
+
+func NewTokenKeysInterface(mode string, opt *pkg.VaultOptions) (api.TokenKeyInterface, error) {
+	switch {
+	case mode == "googleKmsGcs":
+		return gcs.New(opt)
 	}
 
 	return nil, errors.New("unknown/unsupported unsealing mode")

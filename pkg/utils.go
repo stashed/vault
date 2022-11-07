@@ -81,15 +81,15 @@ const (
 	EnvVaultCACert        = "VAULT_CACERT"
 )
 
-type vaultOptions struct {
-	kubeClient    kubernetes.Interface
+type VaultOptions struct {
+	KubeClient    kubernetes.Interface
 	stashClient   stash.Interface
 	catalogClient appcatalog_cs.Interface
 
 	namespace           string
 	backupSessionName   string
-	appBindingName      string
-	appBindingNamespace string
+	AppBindingName      string
+	AppBindingNamespace string
 	vaultArgs           string
 	waitTimeout         int32
 	outputDir           string
@@ -126,7 +126,7 @@ type sessionWrapper struct {
 	cmd *restic.Command
 }
 
-func (opt *vaultOptions) newSessionWrapper(cmd string) *sessionWrapper {
+func (opt *VaultOptions) newSessionWrapper(cmd string) *sessionWrapper {
 	return &sessionWrapper{
 		sh: shell.NewSession(),
 		cmd: &restic.Command{

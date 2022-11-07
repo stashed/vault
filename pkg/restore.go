@@ -38,7 +38,7 @@ func NewCmdRestore() *cobra.Command {
 		masterURL      string
 		kubeconfigPath string
 
-		opt = vaultOptions{
+		opt = VaultOptions{
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
 				EnableCache: false,
@@ -64,7 +64,7 @@ func NewCmdRestore() *cobra.Command {
 			}
 			opt.config = config
 
-			opt.kubeClient, err = kubernetes.NewForConfig(config)
+			opt.KubeClient, err = kubernetes.NewForConfig(config)
 			if err != nil {
 				return err
 			}
@@ -76,8 +76,8 @@ func NewCmdRestore() *cobra.Command {
 			targetRef := api_v1beta1.TargetRef{
 				APIVersion: appcatalog.SchemeGroupVersion.String(),
 				Kind:       appcatalog.ResourceKindApp,
-				Name:       opt.appBindingName,
-				Namespace:  opt.appBindingNamespace,
+				Name:       opt.AppBindingName,
+				Namespace:  opt.AppBindingNamespace,
 			}
 
 			var restoreOutput *restic.RestoreOutput
@@ -111,8 +111,8 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().StringVar(&masterURL, "master", masterURL, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	cmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", kubeconfigPath, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	cmd.Flags().StringVar(&opt.namespace, "namespace", "default", "Namespace of Backup/Restore Session")
-	cmd.Flags().StringVar(&opt.appBindingName, "appbinding", opt.appBindingName, "Name of the app binding")
-	cmd.Flags().StringVar(&opt.appBindingNamespace, "appbinding-namespace", opt.appBindingNamespace, "Namespace of the app binding")
+	cmd.Flags().StringVar(&opt.AppBindingName, "appbinding", opt.AppBindingName, "Name of the app binding")
+	cmd.Flags().StringVar(&opt.AppBindingNamespace, "appbinding-namespace", opt.AppBindingNamespace, "Namespace of the app binding")
 	cmd.Flags().StringVar(&opt.setupOptions.Provider, "provider", opt.setupOptions.Provider, "Backend provider (i.e. gcs, s3, azure etc)")
 	cmd.Flags().StringVar(&opt.setupOptions.Bucket, "bucket", opt.setupOptions.Bucket, "Name of the cloud bucket/container (keep empty for local backend)")
 	cmd.Flags().StringVar(&opt.setupOptions.Endpoint, "endpoint", opt.setupOptions.Endpoint, "Endpoint for s3/s3 compatible backend or REST backend URL")
@@ -153,7 +153,7 @@ func NewCmdRestore() *cobra.Command {
 	return cmd
 }
 
-func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.RestoreOutput, error) {
+func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.RestoreOutput, error) {
 	var err error
 
 	err = license.CheckLicenseEndpoint(opt.config, licenseApiService, SupportedProducts)
@@ -161,7 +161,7 @@ func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	opt.setupOptions.StorageSecret, err = opt.kubeClient.CoreV1().Secrets(opt.storageSecret.Namespace).Get(context.TODO(), opt.storageSecret.Name, metav1.GetOptions{})
+	opt.setupOptions.StorageSecret, err = opt.KubeClient.CoreV1().Secrets(opt.storageSecret.Namespace).Get(context.TODO(), opt.storageSecret.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	appBinding, err := opt.catalogClient.AppcatalogV1alpha1().AppBindings(opt.appBindingNamespace).Get(context.TODO(), opt.appBindingName, metav1.GetOptions{})
+	appBinding, err := opt.catalogClient.AppcatalogV1alpha1().AppBindings(opt.AppBindingNamespace).Get(context.TODO(), opt.AppBindingName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	err = session.setVaultToken(opt.kubeClient, appBinding)
+	err = session.setVaultToken(opt.KubeClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 	return restoreOutput, nil
 }
 
-func (opt *vaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
+func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 	session.cmd.Args = append(session.cmd.Args, "operator", "raft", "snapshot", "restore")
 
 	// -force is required for different vault cluster snapshot restoration
@@ -259,13 +259,13 @@ func (opt *vaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 	return nil
 }
 
-func (opt *vaultOptions) migrateTokenKeys() error {
-	src, err := token_keys_store.NewTokenKeysInterface(opt.OldUnsealMode, opt.kubeClient)
+func (opt *VaultOptions) migrateTokenKeys() error {
+	src, err := token_keys_store.OldTokenKeysInterface(opt.OldUnsealMode, opt)
 	if err != nil {
 		return err
 	}
 
-	dst, err := token_keys_store.NewTokenKeysInterface(opt.NewUnsealMode, opt.kubeClient)
+	dst, err := token_keys_store.NewTokenKeysInterface(opt.NewUnsealMode, opt)
 	if err != nil {
 		return err
 	}
