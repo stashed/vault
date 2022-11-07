@@ -102,7 +102,9 @@ type VaultOptions struct {
 
 	interimDataDir string
 
-	force bool
+	force        bool
+	KeyPrefix    string
+	SecretShares int64
 
 	OldUnsealMode          string
 	OldKmsCryptoKey        string
@@ -119,6 +121,9 @@ type VaultOptions struct {
 	NewKmsProject          string
 	NewBucket              string
 	NewCredentialSecretRef string
+
+	OldSecretName string
+	NewSecretName string
 }
 
 type sessionWrapper struct {

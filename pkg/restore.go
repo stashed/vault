@@ -16,10 +16,10 @@ package pkg
 import (
 	"context"
 	"path/filepath"
+	"strings"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	"stash.appscode.dev/apimachinery/pkg/restic"
-	token_keys_store "stash.appscode.dev/vault/pkg/token-keys-store"
 
 	"github.com/spf13/cobra"
 	license "go.bytebuilders.dev/license-verifier/kubernetes"
@@ -31,6 +31,7 @@ import (
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
+	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
 func NewCmdRestore() *cobra.Command {
@@ -133,7 +134,9 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().StringVar(&opt.outputDir, "output-dir", opt.outputDir, "Directory where output.json file will be written (keep empty if you don't need to write output in file)")
 
 	cmd.Flags().BoolVar(&opt.force, "force", opt.force, "Specify whether to force restore or not")
+	cmd.Flags().Int64Var(&opt.SecretShares, "secret-shares", opt.SecretShares, "number of secret shares")
 
+	// for unseal mode google kms gcs
 	cmd.Flags().StringVar(&opt.OldUnsealMode, "old-unseal-mode", opt.OldUnsealMode, "specifies the mode of storing old token & unseal keys")
 	cmd.Flags().StringVar(&opt.OldKmsCryptoKey, "old-kms-crypto-key", opt.OldKmsCryptoKey, "crypto key")
 	cmd.Flags().StringVar(&opt.OldKmsKeyRing, "old-kms-key-ring", opt.OldKmsKeyRing, "key ring")
@@ -149,6 +152,10 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().StringVar(&opt.NewKmsProject, "new-kms-project", opt.NewKmsProject, "kms project")
 	cmd.Flags().StringVar(&opt.NewBucket, "new-bucket", opt.NewBucket, "bucket")
 	cmd.Flags().StringVar(&opt.NewCredentialSecretRef, "new-credential-secret-ref", opt.NewCredentialSecretRef, "credential secret")
+
+	// for unseal mode kubernetes secret
+	cmd.Flags().StringVar(&opt.OldSecretName, "old-secret-name", opt.OldSecretName, "old k8s secret name")
+	cmd.Flags().StringVar(&opt.NewSecretName, "new-secret-name", opt.NewSecretName, "new k8s secret name")
 
 	return cmd
 }
@@ -212,9 +219,13 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	err = opt.migrateTokenKeys()
-	if err != nil {
-		return nil, err
+	if opt.force {
+		klog.Infoln("Try to migrate keys...")
+		err = opt.migrateTokenKeys()
+		if err != nil {
+			return nil, err
+		}
+		klog.Infoln("Successfully migrated keys")
 	}
 
 	opt.restoreOptions.RestorePaths = []string{opt.interimDataDir}
@@ -260,17 +271,33 @@ func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 }
 
 func (opt *VaultOptions) migrateTokenKeys() error {
-	src, err := token_keys_store.OldTokenKeysInterface(opt.OldUnsealMode, opt)
+	klog.Infoln("=============== migrate keys ================")
+	sts, err := opt.KubeClient.AppsV1().StatefulSets(opt.AppBindingNamespace).Get(context.TODO(), opt.AppBindingName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	dst, err := token_keys_store.NewTokenKeysInterface(opt.NewUnsealMode, opt)
+	var keyPrefix string
+	for _, cont := range sts.Spec.Template.Spec.Containers {
+		if cont.Name != vaultapi.VaultUnsealerContainerName {
+			continue
+		}
+		for _, arg := range cont.Args {
+			if strings.HasPrefix(arg, "--key-prefix=") {
+				keyPrefix = arg[1+strings.Index(arg, "="):]
+			}
+		}
+	}
+
+	opt.KeyPrefix = keyPrefix
+
+	keys, err := opt.GetTokenKeys()
 	if err != nil {
+		klog.Infoln("failed to get token keys: ", err.Error())
 		return err
 	}
 
-	// migrate from src to dst
-	klog.Infoln(src.TokenName(), dst.TokenName())
-	return nil
+	klog.Infoln("========== keys ==========")
+	klog.Infoln(keys)
+	return opt.SetTokenKeys(keys)
 }
