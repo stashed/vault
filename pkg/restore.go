@@ -155,8 +155,19 @@ func NewCmdRestore() *cobra.Command {
 
 	// for unseal mode kubernetes secret
 	cmd.Flags().StringVar(&opt.OldSecretName, "old-secret-name", opt.OldSecretName, "old k8s secret name")
+
 	cmd.Flags().StringVar(&opt.NewSecretName, "new-secret-name", opt.NewSecretName, "new k8s secret name")
 
+	// for unseal mode aws kms
+	cmd.Flags().StringVar(&opt.OldKmsKeyID, "old-kms-key-id", opt.OldKmsKeyID, "old kms key id")
+	cmd.Flags().StringVar(&opt.OldSsmKeyPrefix, "old-ssm-key-prefix", opt.OldSsmKeyPrefix, "old ssm key prefix")
+	cmd.Flags().StringVar(&opt.OldRegion, "old-region", opt.OldRegion, "old region")
+	cmd.Flags().StringVar(&opt.OldEndpoint, "old-endpoint", opt.OldEndpoint, "old endpoint")
+
+	cmd.Flags().StringVar(&opt.NewKmsKeyID, "new-kms-key-id", opt.NewKmsKeyID, "new kms key id")
+	cmd.Flags().StringVar(&opt.NewSsmKeyPrefix, "new-ssm-key-prefix", opt.NewSsmKeyPrefix, "new ssm key prefix")
+	cmd.Flags().StringVar(&opt.NewRegion, "new-region", opt.NewRegion, "new region")
+	cmd.Flags().StringVar(&opt.NewEndpoint, "new-endpoint", opt.NewEndpoint, "new endpoint")
 	return cmd
 }
 

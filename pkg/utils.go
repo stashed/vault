@@ -124,6 +124,16 @@ type VaultOptions struct {
 
 	OldSecretName string
 	NewSecretName string
+
+	OldKmsKeyID     string
+	OldSsmKeyPrefix string
+	OldRegion       string
+	OldEndpoint     string
+
+	NewKmsKeyID     string
+	NewSsmKeyPrefix string
+	NewRegion       string
+	NewEndpoint     string
 }
 
 type sessionWrapper struct {
