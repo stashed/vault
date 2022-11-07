@@ -220,7 +220,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 	}
 
 	if opt.force {
-		klog.Infoln("Try to migrate keys...")
+		klog.Infof("Try to migrate keys from %s to %s\n", opt.OldUnsealMode, opt.NewUnsealMode)
 		err = opt.migrateTokenKeys()
 		if err != nil {
 			return nil, err
@@ -252,7 +252,6 @@ func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 	session.cmd.Args = append(session.cmd.Args, "operator", "raft", "snapshot", "restore")
 
 	// -force is required for different vault cluster snapshot restoration
-	// although, -force restore doesn't make any difference for same vault cluster
 	if opt.force {
 		session.cmd.Args = append(session.cmd.Args, "-force")
 	}
@@ -271,7 +270,6 @@ func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 }
 
 func (opt *VaultOptions) migrateTokenKeys() error {
-	klog.Infoln("=============== migrate keys ================")
 	sts, err := opt.KubeClient.AppsV1().StatefulSets(opt.AppBindingNamespace).Get(context.TODO(), opt.AppBindingName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -297,7 +295,5 @@ func (opt *VaultOptions) migrateTokenKeys() error {
 		return err
 	}
 
-	klog.Infoln("========== keys ==========")
-	klog.Infoln(keys)
 	return opt.SetTokenKeys(keys)
 }

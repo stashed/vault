@@ -35,7 +35,6 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -56,7 +55,7 @@ func (opt *VaultOptions) GetTokenKeys() (map[string]string, error) {
 		return opt.getK8sTokenKeys()
 	}
 
-	return nil, nil
+	return nil, errors.New("unknown unseal mode")
 }
 
 func (opt *VaultOptions) SetTokenKeys(keys map[string]string) error {
@@ -70,8 +69,8 @@ func (opt *VaultOptions) SetTokenKeys(keys map[string]string) error {
 	return errors.New("unknown unseal mode")
 }
 
-func (opt *VaultOptions) getGcsTokenKeys() (map[string]string, error) {
-	secret, err := opt.KubeClient.CoreV1().Secrets(opt.AppBindingNamespace).Get(context.TODO(), opt.OldCredentialSecretRef, metav1.GetOptions{})
+func (opt *VaultOptions) NewGcsClient(cred string) (*storage.Client, error) {
+	secret, err := opt.KubeClient.CoreV1().Secrets(opt.AppBindingNamespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -99,18 +98,17 @@ func (opt *VaultOptions) getGcsTokenKeys() (map[string]string, error) {
 		return nil, err
 	}
 
-	keys := make(map[string]string)
+	return client, nil
+}
 
-	var key string
-	key = opt.tokenName()
-	keys[key] = ""
-	for id := 0; int64(id) < opt.SecretShares; id++ {
-		key = opt.unsealKeyName(id)
-		keys[key] = ""
+func (opt *VaultOptions) getGcsTokenKeys() (map[string]string, error) {
+	client, err := opt.NewGcsClient(opt.OldCredentialSecretRef)
+	if err != nil {
+		return nil, err
 	}
 
-	klog.Infoln("keys; ", keys)
-	for key = range keys {
+	keys := opt.getKeys()
+	for key := range keys {
 		rc, err := client.Bucket(opt.OldBucket).Object(key).NewReader(context.TODO())
 		if err != nil {
 			return nil, err
@@ -138,30 +136,7 @@ func (opt *VaultOptions) getGcsTokenKeys() (map[string]string, error) {
 }
 
 func (opt *VaultOptions) setGcsTokenKeys(keys map[string]string) error {
-	secret, err := opt.KubeClient.CoreV1().Secrets(opt.AppBindingNamespace).Get(context.TODO(), opt.NewCredentialSecretRef, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	if _, ok := secret.Data[ServiceAccountJSON]; !ok {
-		return errors.Errorf("%s not found in secret", ServiceAccountJSON)
-	}
-
-	path := filepath.Join("/tmp", fmt.Sprintf("google-sa-cred-%s", randomString(6)))
-	if err = os.MkdirAll(path, os.ModePerm); err != nil {
-		return err
-	}
-
-	saFile := filepath.Join(path, ServiceAccountJSON)
-	if err = os.WriteFile(saFile, secret.Data[ServiceAccountJSON], os.ModePerm); err != nil {
-		return err
-	}
-
-	if err = os.Setenv(GoogleApplicationCred, saFile); err != nil {
-		return err
-	}
-
-	client, err := storage.NewClient(context.TODO())
+	client, err := opt.NewGcsClient(opt.NewCredentialSecretRef)
 	if err != nil {
 		return err
 	}
@@ -238,16 +213,7 @@ func (opt *VaultOptions) getK8sTokenKeys() (map[string]string, error) {
 		return nil, err
 	}
 
-	keys := make(map[string]string)
-
-	var key string
-	key = opt.tokenName()
-	keys[key] = ""
-	for id := 0; int64(id) < opt.SecretShares; id++ {
-		key = opt.unsealKeyName(id)
-		keys[key] = ""
-	}
-
+	keys := opt.getKeys()
 	for k, v := range secret.Data {
 		keys[k] = string(v)
 	}
@@ -267,6 +233,20 @@ func (opt *VaultOptions) setK8sTokenKeys(keys map[string]string) error {
 
 	_, err = opt.KubeClient.CoreV1().Secrets(opt.AppBindingNamespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 	return err
+}
+
+func (opt *VaultOptions) getKeys() map[string]string {
+	keys := make(map[string]string)
+
+	var key string
+	key = opt.tokenName()
+	keys[key] = ""
+	for id := 0; int64(id) < opt.SecretShares; id++ {
+		key = opt.unsealKeyName(id)
+		keys[key] = ""
+	}
+
+	return keys
 }
 
 func (opt *VaultOptions) unsealKeyName(id int) string {
