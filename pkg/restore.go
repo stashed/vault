@@ -21,6 +21,7 @@ import (
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	"stash.appscode.dev/apimachinery/pkg/restic"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	license "go.bytebuilders.dev/license-verifier/kubernetes"
 	"gomodules.xyz/flags"
@@ -32,6 +33,7 @@ import (
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
+	cs "kubevault.dev/apimachinery/client/clientset/versioned"
 )
 
 func NewCmdRestore() *cobra.Command {
@@ -70,6 +72,10 @@ func NewCmdRestore() *cobra.Command {
 				return err
 			}
 			opt.catalogClient, err = appcatalog_cs.NewForConfig(config)
+			if err != nil {
+				return err
+			}
+			opt.extClient, err = cs.NewForConfig(config)
 			if err != nil {
 				return err
 			}
@@ -133,41 +139,33 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().StringVar(&opt.interimDataDir, "interim-data-dir", opt.interimDataDir, "Directory where the restored data will be stored temporarily before injecting into the desired NATS Server")
 	cmd.Flags().StringVar(&opt.outputDir, "output-dir", opt.outputDir, "Directory where output.json file will be written (keep empty if you don't need to write output in file)")
 
+	// vault related flags
 	cmd.Flags().BoolVar(&opt.force, "force", opt.force, "Specify whether to force restore or not")
-	cmd.Flags().Int64Var(&opt.SecretShares, "secret-shares", opt.SecretShares, "number of secret shares")
+	cmd.Flags().Int64Var(&opt.secretShares, "secret-shares", opt.secretShares, "number of secret shares")
+	cmd.Flags().StringVar(&opt.unsealMode, "unseal-mode", opt.unsealMode, "specifies the mode of old token & unseal keys")
 
 	// for unseal mode google kms gcs
-	cmd.Flags().StringVar(&opt.OldUnsealMode, "old-unseal-mode", opt.OldUnsealMode, "specifies the mode of storing old token & unseal keys")
-	cmd.Flags().StringVar(&opt.OldKmsCryptoKey, "old-kms-crypto-key", opt.OldKmsCryptoKey, "crypto key")
-	cmd.Flags().StringVar(&opt.OldKmsKeyRing, "old-kms-key-ring", opt.OldKmsKeyRing, "key ring")
-	cmd.Flags().StringVar(&opt.OldKmsLocation, "old-kms-location", opt.OldKmsKeyRing, "key ring")
-	cmd.Flags().StringVar(&opt.OldKmsProject, "old-kms-project", opt.OldKmsKeyRing, "kms project")
-	cmd.Flags().StringVar(&opt.OldBucket, "old-bucket", opt.OldKmsKeyRing, "bucket")
-	cmd.Flags().StringVar(&opt.OldCredentialSecretRef, "old-credential-secret-ref", opt.OldKmsKeyRing, "credential secret")
-
-	cmd.Flags().StringVar(&opt.NewUnsealMode, "new-unseal-mode", opt.NewUnsealMode, "specifies the mode of storing new token & unseal keys")
-	cmd.Flags().StringVar(&opt.NewKmsCryptoKey, "new-kms-crypto-key", opt.NewKmsCryptoKey, "crypto key")
-	cmd.Flags().StringVar(&opt.NewKmsLocation, "new-kms-location", opt.NewKmsLocation, "key ring")
-	cmd.Flags().StringVar(&opt.NewKmsKeyRing, "new-kms-key-ring", opt.NewKmsKeyRing, "kms location")
-	cmd.Flags().StringVar(&opt.NewKmsProject, "new-kms-project", opt.NewKmsProject, "kms project")
-	cmd.Flags().StringVar(&opt.NewBucket, "new-bucket", opt.NewBucket, "bucket")
-	cmd.Flags().StringVar(&opt.NewCredentialSecretRef, "new-credential-secret-ref", opt.NewCredentialSecretRef, "credential secret")
+	cmd.Flags().StringVar(&opt.kmsCryptoKey, "kms-crypto-key", opt.kmsCryptoKey, "crypto key")
+	cmd.Flags().StringVar(&opt.kmsKeyRing, "kms-key-ring", opt.kmsKeyRing, "key ring")
+	cmd.Flags().StringVar(&opt.kmsLocation, "kms-location", opt.kmsLocation, "key ring")
+	cmd.Flags().StringVar(&opt.kmsProject, "kms-project", opt.kmsProject, "kms project")
+	cmd.Flags().StringVar(&opt.bucket, "vault-bucket", opt.bucket, "bucket")
+	cmd.Flags().StringVar(&opt.credentialSecretRef, "credential-secret-ref", opt.credentialSecretRef, "credential secret")
 
 	// for unseal mode kubernetes secret
-	cmd.Flags().StringVar(&opt.OldSecretName, "old-secret-name", opt.OldSecretName, "old k8s secret name")
-
-	cmd.Flags().StringVar(&opt.NewSecretName, "new-secret-name", opt.NewSecretName, "new k8s secret name")
+	cmd.Flags().StringVar(&opt.secretName, "secret-name", opt.secretName, "k8s secret name where previous unseal keys & token are stored")
 
 	// for unseal mode aws kms
-	cmd.Flags().StringVar(&opt.OldKmsKeyID, "old-kms-key-id", opt.OldKmsKeyID, "old kms key id")
-	cmd.Flags().StringVar(&opt.OldSsmKeyPrefix, "old-ssm-key-prefix", opt.OldSsmKeyPrefix, "old ssm key prefix")
-	cmd.Flags().StringVar(&opt.OldRegion, "old-region", opt.OldRegion, "old region")
-	cmd.Flags().StringVar(&opt.OldEndpoint, "old-endpoint", opt.OldEndpoint, "old endpoint")
+	cmd.Flags().StringVar(&opt.kmsKeyID, "kms-key-id", opt.kmsKeyID, "kms key id")
+	cmd.Flags().StringVar(&opt.ssmKeyPrefix, "ssm-key-prefix", opt.ssmKeyPrefix, "ssm key prefix")
+	cmd.Flags().StringVar(&opt.region, "vault-region", opt.region, "vault region")
+	cmd.Flags().StringVar(&opt.endpoint, "vault-endpoint", opt.endpoint, "vault endpoint")
 
-	cmd.Flags().StringVar(&opt.NewKmsKeyID, "new-kms-key-id", opt.NewKmsKeyID, "new kms key id")
-	cmd.Flags().StringVar(&opt.NewSsmKeyPrefix, "new-ssm-key-prefix", opt.NewSsmKeyPrefix, "new ssm key prefix")
-	cmd.Flags().StringVar(&opt.NewRegion, "new-region", opt.NewRegion, "new region")
-	cmd.Flags().StringVar(&opt.NewEndpoint, "new-endpoint", opt.NewEndpoint, "new endpoint")
+	// for unseal mode azure key vault
+	cmd.Flags().StringVar(&opt.vaultBaseURL, "vault-base-url", opt.vaultBaseURL, "vault base url")
+	cmd.Flags().StringVar(&opt.cloud, "cloud", opt.cloud, "cloud")
+	cmd.Flags().StringVar(&opt.tenantID, "tenant-id", opt.tenantID, "tenant ID")
+
 	return cmd
 }
 
@@ -230,9 +228,25 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
+	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if vs.Spec.Backend.Raft == nil {
+		return nil, errors.New("Backend must be Raft for restoring snapshots")
+	}
+
+	if vs.Status.Phase != vaultapi.VaultServerPhaseReady {
+		return nil, errors.New("VaultServer not ready")
+	}
+
+	klog.Infof("Try to restore for VaultServer %s/%s\n", vs.Namespace, vs.Name)
+
+	// restore snapshot on a different Vault cluster, -force, previous unseal keys are required
 	if opt.force {
-		klog.Infof("Try to migrate keys from %s to %s\n", opt.OldUnsealMode, opt.NewUnsealMode)
-		err = opt.migrateTokenKeys()
+		klog.Infof("Try to migrate keys from %s\n", opt.unsealMode)
+		err = opt.migrateTokenKeys(vs)
 		if err != nil {
 			return nil, err
 		}
@@ -280,10 +294,26 @@ func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 	return nil
 }
 
-func (opt *VaultOptions) migrateTokenKeys() error {
-	sts, err := opt.KubeClient.AppsV1().StatefulSets(opt.AppBindingNamespace).Get(context.TODO(), opt.AppBindingName, metav1.GetOptions{})
+func (opt *VaultOptions) migrateTokenKeys(vs *vaultapi.VaultServer) error {
+	keyPrefix, err := opt.getKeyPrefix()
 	if err != nil {
 		return err
+	}
+
+	opt.KeyPrefix = keyPrefix
+
+	keys, err := opt.GetTokenKeys()
+	if err != nil {
+		return err
+	}
+
+	return opt.SetTokenKeys(vs, keys)
+}
+
+func (opt *VaultOptions) getKeyPrefix() (string, error) {
+	sts, err := opt.KubeClient.AppsV1().StatefulSets(opt.AppBindingNamespace).Get(context.TODO(), opt.AppBindingName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
 	}
 
 	var keyPrefix string
@@ -298,13 +328,5 @@ func (opt *VaultOptions) migrateTokenKeys() error {
 		}
 	}
 
-	opt.KeyPrefix = keyPrefix
-
-	keys, err := opt.GetTokenKeys()
-	if err != nil {
-		klog.Infoln("failed to get token keys: ", err.Error())
-		return err
-	}
-
-	return opt.SetTokenKeys(keys)
+	return keyPrefix, nil
 }

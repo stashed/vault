@@ -25,15 +25,19 @@ import (
 	"stash.appscode.dev/apimachinery/pkg/restic"
 	api_util "stash.appscode.dev/apimachinery/pkg/util"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	license "go.bytebuilders.dev/license-verifier/kubernetes"
 	"gomodules.xyz/flags"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
+	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
+	cs "kubevault.dev/apimachinery/client/clientset/versioned"
 )
 
 func NewCmdBackup() *cobra.Command {
@@ -77,6 +81,11 @@ func NewCmdBackup() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			opt.extClient, err = cs.NewForConfig(config)
+			if err != nil {
+				return err
+			}
+
 			targetRef := api_v1beta1.TargetRef{
 				APIVersion: appcatalog.SchemeGroupVersion.String(),
 				Kind:       appcatalog.ResourceKindApp,
@@ -222,6 +231,21 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 	if err != nil {
 		return nil, err
 	}
+
+	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if vs.Spec.Backend.Raft == nil {
+		return nil, errors.New("Backend must be Raft for backup snapshots")
+	}
+
+	if vs.Status.Phase != vaultapi.VaultServerPhaseReady {
+		return nil, errors.New("VaultServer not ready")
+	}
+
+	klog.Infof("Try to backup for VaultServer %s/%s\n", vs.Namespace, vs.Name)
 
 	err = opt.saveVaultSnapshot(session)
 	if err != nil {

@@ -35,6 +35,7 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
 const (
@@ -47,8 +48,10 @@ const (
 	GoogleApplicationCred = "GOOGLE_APPLICATION_CREDENTIALS"
 )
 
+// get from  the old unseal mode using the flags
+
 func (opt *VaultOptions) GetTokenKeys() (map[string]string, error) {
-	switch opt.OldUnsealMode {
+	switch opt.unsealMode {
 	case UnsealModeGoogleKmsGcs:
 		return opt.getGcsTokenKeys()
 	case UnsealModeKubernetesSecret:
@@ -58,12 +61,15 @@ func (opt *VaultOptions) GetTokenKeys() (map[string]string, error) {
 	return nil, errors.New("unknown unseal mode")
 }
 
-func (opt *VaultOptions) SetTokenKeys(keys map[string]string) error {
-	switch opt.NewUnsealMode {
-	case UnsealModeGoogleKmsGcs:
-		return opt.setGcsTokenKeys(keys)
-	case UnsealModeKubernetesSecret:
-		return opt.setK8sTokenKeys(keys)
+// set to the new unseal mode using the vs
+
+func (opt *VaultOptions) SetTokenKeys(vs *vaultapi.VaultServer, keys map[string]string) error {
+	mode := vs.Spec.Unsealer.Mode
+	switch true {
+	case mode.GoogleKmsGcs != nil:
+		return opt.setGcsTokenKeys(vs, keys)
+	case mode.KubernetesSecret != nil:
+		return opt.setK8sTokenKeys(vs, keys)
 	}
 
 	return errors.New("unknown unseal mode")
@@ -102,14 +108,14 @@ func (opt *VaultOptions) NewGcsClient(cred string) (*storage.Client, error) {
 }
 
 func (opt *VaultOptions) getGcsTokenKeys() (map[string]string, error) {
-	client, err := opt.NewGcsClient(opt.OldCredentialSecretRef)
+	client, err := opt.NewGcsClient(opt.credentialSecretRef)
 	if err != nil {
 		return nil, err
 	}
 
 	keys := opt.getKeys()
 	for key := range keys {
-		rc, err := client.Bucket(opt.OldBucket).Object(key).NewReader(context.TODO())
+		rc, err := client.Bucket(opt.bucket).Object(key).NewReader(context.TODO())
 		if err != nil {
 			return nil, err
 		}
@@ -121,8 +127,8 @@ func (opt *VaultOptions) getGcsTokenKeys() (map[string]string, error) {
 		}
 
 		name := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
-			opt.OldKmsProject, opt.OldKmsLocation,
-			opt.OldKmsKeyRing, opt.OldKmsCryptoKey)
+			opt.kmsProject, opt.kmsLocation,
+			opt.kmsKeyRing, opt.kmsCryptoKey)
 
 		decryptedToken, err := decryptSymmetric(name, body)
 		if err != nil {
@@ -135,8 +141,15 @@ func (opt *VaultOptions) getGcsTokenKeys() (map[string]string, error) {
 	return keys, nil
 }
 
-func (opt *VaultOptions) setGcsTokenKeys(keys map[string]string) error {
-	client, err := opt.NewGcsClient(opt.NewCredentialSecretRef)
+func (opt *VaultOptions) setGcsTokenKeys(vs *vaultapi.VaultServer, keys map[string]string) error {
+	mode := vs.Spec.Unsealer.Mode
+
+	var credRef string
+	if mode.GoogleKmsGcs.CredentialSecretRef != nil {
+		credRef = mode.GoogleKmsGcs.CredentialSecretRef.Name
+	}
+
+	client, err := opt.NewGcsClient(credRef)
 	if err != nil {
 		return err
 	}
@@ -147,8 +160,8 @@ func (opt *VaultOptions) setGcsTokenKeys(keys map[string]string) error {
 	}
 
 	name := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
-		opt.NewKmsProject, opt.NewKmsLocation,
-		opt.NewKmsKeyRing, opt.NewKmsCryptoKey)
+		mode.GoogleKmsGcs.KmsProject, mode.GoogleKmsGcs.KmsLocation,
+		mode.GoogleKmsGcs.KmsKeyRing, mode.GoogleKmsGcs.KmsCryptoKey)
 
 	for key, value := range keys {
 		resp, err := kmsService.Projects.Locations.KeyRings.CryptoKeys.Encrypt(name, &cloudkms.EncryptRequest{
@@ -163,9 +176,9 @@ func (opt *VaultOptions) setGcsTokenKeys(keys map[string]string) error {
 			return err
 		}
 
-		w := client.Bucket(opt.NewBucket).Object(key).NewWriter(context.TODO())
+		w := client.Bucket(mode.GoogleKmsGcs.Bucket).Object(key).NewWriter(context.TODO())
 		if _, err := w.Write(cipherText); err != nil {
-			return fmt.Errorf("error writing key '%s' to gcs bucket '%s'", key, opt.NewBucket)
+			return fmt.Errorf("error writing key '%s' to gcs bucket '%s'", key, mode.GoogleKmsGcs.Bucket)
 		}
 
 		if err = w.Close(); err != nil {
@@ -208,7 +221,7 @@ func decryptSymmetric(name string, ciphertext []byte) (string, error) {
 }
 
 func (opt *VaultOptions) getK8sTokenKeys() (map[string]string, error) {
-	secret, err := opt.KubeClient.CoreV1().Secrets(opt.AppBindingNamespace).Get(context.TODO(), opt.OldSecretName, metav1.GetOptions{})
+	secret, err := opt.KubeClient.CoreV1().Secrets(opt.AppBindingNamespace).Get(context.TODO(), opt.secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -221,8 +234,14 @@ func (opt *VaultOptions) getK8sTokenKeys() (map[string]string, error) {
 	return keys, nil
 }
 
-func (opt *VaultOptions) setK8sTokenKeys(keys map[string]string) error {
-	secret, err := opt.KubeClient.CoreV1().Secrets(opt.AppBindingNamespace).Get(context.TODO(), opt.NewSecretName, metav1.GetOptions{})
+func (opt *VaultOptions) setK8sTokenKeys(vs *vaultapi.VaultServer, keys map[string]string) error {
+	mode := vs.Spec.Unsealer.Mode
+	var secretName string
+	if mode.KubernetesSecret != nil {
+		secretName = mode.KubernetesSecret.SecretName
+	}
+
+	secret, err := opt.KubeClient.CoreV1().Secrets(opt.AppBindingNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -241,7 +260,7 @@ func (opt *VaultOptions) getKeys() map[string]string {
 	var key string
 	key = opt.tokenName()
 	keys[key] = ""
-	for id := 0; int64(id) < opt.SecretShares; id++ {
+	for id := 0; int64(id) < opt.secretShares; id++ {
 		key = opt.unsealKeyName(id)
 		keys[key] = ""
 	}

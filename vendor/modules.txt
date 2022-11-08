@@ -965,13 +965,34 @@ kmodules.xyz/prober/api/v1
 # kubevault.dev/apimachinery v0.10.0
 ## explicit; go 1.18
 kubevault.dev/apimachinery/apis
+kubevault.dev/apimachinery/apis/catalog
+kubevault.dev/apimachinery/apis/catalog/v1alpha1
+kubevault.dev/apimachinery/apis/config
+kubevault.dev/apimachinery/apis/config/v1alpha1
+kubevault.dev/apimachinery/apis/engine
+kubevault.dev/apimachinery/apis/engine/v1alpha1
 kubevault.dev/apimachinery/apis/kubevault
+kubevault.dev/apimachinery/apis/kubevault/v1alpha1
 kubevault.dev/apimachinery/apis/kubevault/v1alpha2
+kubevault.dev/apimachinery/apis/ops
+kubevault.dev/apimachinery/apis/ops/v1alpha1
+kubevault.dev/apimachinery/apis/policy
+kubevault.dev/apimachinery/apis/policy/v1alpha1
+kubevault.dev/apimachinery/client/clientset/versioned
+kubevault.dev/apimachinery/client/clientset/versioned/scheme
+kubevault.dev/apimachinery/client/clientset/versioned/typed/catalog/v1alpha1
+kubevault.dev/apimachinery/client/clientset/versioned/typed/config/v1alpha1
+kubevault.dev/apimachinery/client/clientset/versioned/typed/engine/v1alpha1
+kubevault.dev/apimachinery/client/clientset/versioned/typed/kubevault/v1alpha1
+kubevault.dev/apimachinery/client/clientset/versioned/typed/kubevault/v1alpha2
+kubevault.dev/apimachinery/client/clientset/versioned/typed/ops/v1alpha1
+kubevault.dev/apimachinery/client/clientset/versioned/typed/policy/v1alpha1
 kubevault.dev/apimachinery/crds
 # sigs.k8s.io/controller-runtime v0.13.0
 ## explicit; go 1.17
 sigs.k8s.io/controller-runtime/pkg/client
 sigs.k8s.io/controller-runtime/pkg/client/apiutil
+sigs.k8s.io/controller-runtime/pkg/conversion
 sigs.k8s.io/controller-runtime/pkg/internal/objectutil
 sigs.k8s.io/controller-runtime/pkg/log
 sigs.k8s.io/controller-runtime/pkg/scheme

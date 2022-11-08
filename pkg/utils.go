@@ -38,53 +38,25 @@ import (
 	kmapi "kmodules.xyz/client-go/api/v1"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
+	cs "kubevault.dev/apimachinery/client/clientset/versioned"
 )
 
-// commands:
-// vault operator raft snapshot save backup.snap
-// vault operator raft snapshot restore backup.snap
-
-// vault operator raft snapshot restore -force backup.snap
-
-// Command Options:
-//
-// -force
-// Allow the operation to continue with no key=value pairs. This allows
-// writing to keys that do not need or expect data. This is aliased as
-// "-f". The default is false.
-
-// flags:
-// -address=<string>
-// Address of the Vault server. The default is https://127.0.0.1:8200. This
-// can also be specified via the VAULT_ADDR environment variable.
-// env: VAULT_ADDR
-
-// -tls-skip-verify
-// Disable verification of TLS certificates. Using this option is highly
-// discouraged as it decreases the security of data transmissions to and
-// from the Vault server. The default is false. This can also be specified
-// via the VAULT_SKIP_VERIFY environment variable.
-// env: VAULT_SKIP_VERIFY=true
-
-// VAULT_TOKEN=<token>
-
 const (
-	VaultToken        = "token"
-	VaultSnapshotFile = "backup.snap"
-	VaultCMD          = "vault"
-	VaultTLSRootCA    = "ca.crt"
-	// VaultSnapshotMD       = ""
-	// VaultRestoreCMD       = ""
+	VaultToken            = "token"
+	VaultSnapshotFile     = "backup.snap"
+	VaultCMD              = "vault"
+	VaultTLSRootCA        = "ca.crt"
 	EnvVaultAddress       = "VAULT_ADDR"
 	EnvVaultToken         = "VAULT_TOKEN"
-	EnvVaultSkipVerifyTLS = "VAULT_SKIP_VERIFY"
 	EnvVaultCACert        = "VAULT_CACERT"
+	EnvVaultSkipVerifyTLS = "VAULT_SKIP_VERIFY"
 )
 
 type VaultOptions struct {
 	KubeClient    kubernetes.Interface
 	stashClient   stash.Interface
 	catalogClient appcatalog_cs.Interface
+	extClient     cs.Interface
 
 	namespace           string
 	backupSessionName   string
@@ -102,38 +74,35 @@ type VaultOptions struct {
 
 	interimDataDir string
 
+	// vault related flags
 	force        bool
 	KeyPrefix    string
-	SecretShares int64
+	secretShares int64
+	unsealMode   string
 
-	OldUnsealMode          string
-	OldKmsCryptoKey        string
-	OldKmsKeyRing          string
-	OldKmsLocation         string
-	OldKmsProject          string
-	OldBucket              string
-	OldCredentialSecretRef string
+	// common
+	credentialSecretRef string
 
-	NewUnsealMode          string
-	NewKmsCryptoKey        string
-	NewKmsKeyRing          string
-	NewKmsLocation         string
-	NewKmsProject          string
-	NewBucket              string
-	NewCredentialSecretRef string
+	// for google kms gcs
+	kmsCryptoKey string
+	kmsKeyRing   string
+	kmsLocation  string
+	kmsProject   string
+	bucket       string
 
-	OldSecretName string
-	NewSecretName string
+	// for k8s secret
+	secretName string
 
-	OldKmsKeyID     string
-	OldSsmKeyPrefix string
-	OldRegion       string
-	OldEndpoint     string
+	// for aws kms
+	kmsKeyID     string
+	ssmKeyPrefix string
+	region       string
+	endpoint     string
 
-	NewKmsKeyID     string
-	NewSsmKeyPrefix string
-	NewRegion       string
-	NewEndpoint     string
+	// for azure key vault
+	vaultBaseURL string
+	cloud        string
+	tenantID     string
 }
 
 type sessionWrapper struct {
