@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +39,7 @@ import (
 	kmapi "kmodules.xyz/client-go/api/v1"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
+	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 	cs "kubevault.dev/apimachinery/client/clientset/versioned"
 )
 
@@ -53,15 +55,15 @@ const (
 )
 
 type VaultOptions struct {
-	KubeClient    kubernetes.Interface
+	kubeClient    kubernetes.Interface
 	stashClient   stash.Interface
 	catalogClient appcatalog_cs.Interface
 	extClient     cs.Interface
 
 	namespace           string
 	backupSessionName   string
-	AppBindingName      string
-	AppBindingNamespace string
+	appBindingName      string
+	appBindingNamespace string
 	vaultArgs           string
 	waitTimeout         int32
 	outputDir           string
@@ -248,4 +250,35 @@ func getLeaderAddress(vc *api.Client, appBinding *appcatalog.AppBinding) (string
 
 func backupSecretName(appBinding *appcatalog.AppBinding) string {
 	return fmt.Sprintf("%s-%s-backup-token", appBinding.Name, appBinding.Namespace)
+}
+
+func randomString(n int) string {
+	rand.Seed(time.Now().Unix())
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	s := make([]rune, n)
+	for i := range s {
+		s[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(s)
+}
+
+func (opt *VaultOptions) getKeyPrefix() (string, error) {
+	sts, err := opt.kubeClient.AppsV1().StatefulSets(opt.appBindingNamespace).Get(context.TODO(), opt.appBindingName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var keyPrefix string
+	for _, cont := range sts.Spec.Template.Spec.Containers {
+		if cont.Name != vaultapi.VaultUnsealerContainerName {
+			continue
+		}
+		for _, arg := range cont.Args {
+			if strings.HasPrefix(arg, "--key-prefix=") {
+				keyPrefix = arg[1+strings.Index(arg, "="):]
+			}
+		}
+	}
+
+	return keyPrefix, nil
 }

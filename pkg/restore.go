@@ -16,7 +16,6 @@ package pkg
 import (
 	"context"
 	"path/filepath"
-	"strings"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	"stash.appscode.dev/apimachinery/pkg/restic"
@@ -67,7 +66,7 @@ func NewCmdRestore() *cobra.Command {
 			}
 			opt.config = config
 
-			opt.KubeClient, err = kubernetes.NewForConfig(config)
+			opt.kubeClient, err = kubernetes.NewForConfig(config)
 			if err != nil {
 				return err
 			}
@@ -83,8 +82,8 @@ func NewCmdRestore() *cobra.Command {
 			targetRef := api_v1beta1.TargetRef{
 				APIVersion: appcatalog.SchemeGroupVersion.String(),
 				Kind:       appcatalog.ResourceKindApp,
-				Name:       opt.AppBindingName,
-				Namespace:  opt.AppBindingNamespace,
+				Name:       opt.appBindingName,
+				Namespace:  opt.appBindingNamespace,
 			}
 
 			var restoreOutput *restic.RestoreOutput
@@ -118,8 +117,8 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().StringVar(&masterURL, "master", masterURL, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	cmd.Flags().StringVar(&kubeconfigPath, "kubeconfig", kubeconfigPath, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	cmd.Flags().StringVar(&opt.namespace, "namespace", "default", "Namespace of Backup/Restore Session")
-	cmd.Flags().StringVar(&opt.AppBindingName, "appbinding", opt.AppBindingName, "Name of the app binding")
-	cmd.Flags().StringVar(&opt.AppBindingNamespace, "appbinding-namespace", opt.AppBindingNamespace, "Namespace of the app binding")
+	cmd.Flags().StringVar(&opt.appBindingName, "appbinding", opt.appBindingName, "Name of the app binding")
+	cmd.Flags().StringVar(&opt.appBindingNamespace, "appbinding-namespace", opt.appBindingNamespace, "Namespace of the app binding")
 	cmd.Flags().StringVar(&opt.setupOptions.Provider, "provider", opt.setupOptions.Provider, "Backend provider (i.e. gcs, s3, azure etc)")
 	cmd.Flags().StringVar(&opt.setupOptions.Bucket, "bucket", opt.setupOptions.Bucket, "Name of the cloud bucket/container (keep empty for local backend)")
 	cmd.Flags().StringVar(&opt.setupOptions.Endpoint, "endpoint", opt.setupOptions.Endpoint, "Endpoint for s3/s3 compatible backend or REST backend URL")
@@ -177,7 +176,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	opt.setupOptions.StorageSecret, err = opt.KubeClient.CoreV1().Secrets(opt.storageSecret.Namespace).Get(context.TODO(), opt.storageSecret.Name, metav1.GetOptions{})
+	opt.setupOptions.StorageSecret, err = opt.kubeClient.CoreV1().Secrets(opt.storageSecret.Namespace).Get(context.TODO(), opt.storageSecret.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +191,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	appBinding, err := opt.catalogClient.AppcatalogV1alpha1().AppBindings(opt.AppBindingNamespace).Get(context.TODO(), opt.AppBindingName, metav1.GetOptions{})
+	appBinding, err := opt.catalogClient.AppcatalogV1alpha1().AppBindings(opt.appBindingNamespace).Get(context.TODO(), opt.appBindingName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +207,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	err = session.setVaultToken(opt.KubeClient, appBinding)
+	err = session.setVaultToken(opt.kubeClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
@@ -302,31 +301,10 @@ func (opt *VaultOptions) migrateTokenKeys(vs *vaultapi.VaultServer) error {
 
 	opt.KeyPrefix = keyPrefix
 
-	keys, err := opt.GetTokenKeys()
+	keys, err := opt.getTokenKeys()
 	if err != nil {
 		return err
 	}
 
-	return opt.SetTokenKeys(vs, keys)
-}
-
-func (opt *VaultOptions) getKeyPrefix() (string, error) {
-	sts, err := opt.KubeClient.AppsV1().StatefulSets(opt.AppBindingNamespace).Get(context.TODO(), opt.AppBindingName, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	var keyPrefix string
-	for _, cont := range sts.Spec.Template.Spec.Containers {
-		if cont.Name != vaultapi.VaultUnsealerContainerName {
-			continue
-		}
-		for _, arg := range cont.Args {
-			if strings.HasPrefix(arg, "--key-prefix=") {
-				keyPrefix = arg[1+strings.Index(arg, "="):]
-			}
-		}
-	}
-
-	return keyPrefix, nil
+	return opt.setTokenKeys(vs, keys)
 }
