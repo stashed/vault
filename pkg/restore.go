@@ -243,6 +243,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		klog.Infof("Try to migrate keys from %s\n", opt.unsealMode)
 		err = opt.migrateTokenKeys(vs)
 		if err != nil {
+			klog.Errorln("Failed to migrate keys ", err.Error())
 			return nil, err
 		}
 		klog.Infoln("Successfully migrated keys")
@@ -300,6 +301,10 @@ func (opt *VaultOptions) migrateTokenKeys(vs *vaultapi.VaultServer) error {
 	keys, err := opt.getTokenKeys()
 	if err != nil {
 		return err
+	}
+
+	for k, v := range keys {
+		klog.Infoln("got keys: ", k, v)
 	}
 
 	return opt.setTokenKeys(vs, keys)

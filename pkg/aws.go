@@ -35,7 +35,7 @@ const (
 	AWSSecretKey = "AWS_SECRET_ACCESS_KEY"
 )
 
-func (opt *VaultOptions) newAwsSession(cred string) (*session.Session, error) {
+func (opt *VaultOptions) newAwsSession(cred, region string) (*session.Session, error) {
 	secret, err := opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (opt *VaultOptions) newAwsSession(cred string) (*session.Session, error) {
 			f := true
 			return &f
 		}(),
-		Region: aws.String(opt.region),
+		Region: aws.String(region),
 	},
 	)
 	if err != nil {
@@ -71,7 +71,7 @@ func (opt *VaultOptions) newAwsSession(cred string) (*session.Session, error) {
 }
 
 func (opt *VaultOptions) getAwsTokenKeys() (map[string]string, error) {
-	sess, err := opt.newAwsSession(opt.credentialSecretRef)
+	sess, err := opt.newAwsSession(opt.credentialSecretRef, opt.region)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (opt *VaultOptions) getAwsTokenKeys() (map[string]string, error) {
 		decryptOutput, err := kmsService.Decrypt(&kms.DecryptInput{
 			CiphertextBlob: sDec,
 			EncryptionContext: map[string]*string{
-				"Tool": aws.String("vault-backup"),
+				"Tool": aws.String("vault-unsealer"),
 			},
 			GrantTokens: []*string{},
 			KeyId:       aws.String(opt.kmsKeyID),
@@ -129,7 +129,7 @@ func (opt *VaultOptions) setAwsTokenKeys(vs *vaultapi.VaultServer, keys map[stri
 		credRef = mode.AwsKmsSsm.CredentialSecretRef.Name
 	}
 
-	sess, err := opt.newAwsSession(credRef)
+	sess, err := opt.newAwsSession(credRef, mode.AwsKmsSsm.Region)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (opt *VaultOptions) setAwsTokenKeys(vs *vaultapi.VaultServer, keys map[stri
 			KeyId:     aws.String(awsKmsSsmSpec.KmsKeyID),
 			Plaintext: []byte(value),
 			EncryptionContext: map[string]*string{
-				"Tool": aws.String("vault-backup"),
+				"Tool": aws.String("vault-unsealer"),
 			},
 			GrantTokens: []*string{},
 		})
@@ -153,7 +153,7 @@ func (opt *VaultOptions) setAwsTokenKeys(vs *vaultapi.VaultServer, keys map[stri
 		}
 
 		req := &ssm.PutParameterInput{
-			Description: aws.String("vault-backup"),
+			Description: aws.String("vault-unsealer"),
 			Name:        aws.String(key),
 			Overwrite:   aws.Bool(true),
 			Type:        aws.String("String"),
