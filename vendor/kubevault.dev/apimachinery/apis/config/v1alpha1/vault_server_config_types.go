@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	core "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 const (
 	ResourceKindVaultServerConfiguration = "VaultServerConfiguration"
@@ -50,6 +53,10 @@ type VaultServerConfiguration struct {
 	// Specifies the AWS authentication information
 	// +optional
 	AWS *AWSAuthConfig `json:"aws,omitempty"`
+
+	// Specifies the Secret name that contains the token with permission for backup/restore
+	// +optional
+	VaultBackupToken *core.LocalObjectReference `json:"vaultBackupToken,omitempty"`
 }
 
 // KubernetesAuthConfiguration contains necessary information for

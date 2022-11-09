@@ -19480,10 +19480,16 @@ func schema_apimachinery_apis_config_v1alpha1_VaultServerConfiguration(ref commo
 							Ref:         ref("kubevault.dev/apimachinery/apis/config/v1alpha1.AWSAuthConfig"),
 						},
 					},
+					"vaultBackupToken": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the Secret name that contains the token with permission for backup/restore",
+							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"kubevault.dev/apimachinery/apis/config/v1alpha1.AWSAuthConfig", "kubevault.dev/apimachinery/apis/config/v1alpha1.AzureAuthConfig", "kubevault.dev/apimachinery/apis/config/v1alpha1.KubernetesAuthConfig"},
+			"k8s.io/api/core/v1.LocalObjectReference", "kubevault.dev/apimachinery/apis/config/v1alpha1.AWSAuthConfig", "kubevault.dev/apimachinery/apis/config/v1alpha1.AzureAuthConfig", "kubevault.dev/apimachinery/apis/config/v1alpha1.KubernetesAuthConfig"},
 	}
 }

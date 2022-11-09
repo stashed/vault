@@ -216,17 +216,17 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	err = session.setVaultToken(opt.kubeClient, appBinding)
-	if err != nil {
-		return nil, err
-	}
-
 	err = session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir)
 	if err != nil {
 		return nil, err
 	}
 
 	err = session.waitForVaultReady(vaultClient, opt.waitTimeout, appBinding)
+	if err != nil {
+		return nil, err
+	}
+
+	err = session.setVaultToken(opt.kubeClient, appBinding, vs)
 	if err != nil {
 		return nil, err
 	}

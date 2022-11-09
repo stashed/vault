@@ -31,6 +31,7 @@ import (
 
 	"github.com/hashicorp/vault/api"
 	shell "gomodules.xyz/go-sh"
+	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -107,6 +108,10 @@ type VaultOptions struct {
 	tenantID     string
 }
 
+type BackupToken struct {
+	VaultBackupToken *core.LocalObjectReference `json:"vaultBackupToken,omitempty"`
+}
+
 type sessionWrapper struct {
 	sh  *shell.Session
 	cmd *restic.Command
@@ -121,8 +126,8 @@ func (opt *VaultOptions) newSessionWrapper(cmd string) *sessionWrapper {
 	}
 }
 
-func (session *sessionWrapper) setVaultToken(kubeClient kubernetes.Interface, appBinding *appcatalog.AppBinding) error {
-	tokenSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), backupSecretName(appBinding), metav1.GetOptions{})
+func (session *sessionWrapper) setVaultToken(kubeClient kubernetes.Interface, appBinding *appcatalog.AppBinding, vs *vaultapi.VaultServer) error {
+	tokenSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), vs.BackupSecretName(), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -253,10 +258,6 @@ func getLeaderAddress(vc *api.Client, appBinding *appcatalog.AppBinding) (string
 	leaderAddr := fmt.Sprintf("%s://%s.%s.svc:%d", appBinding.Spec.ClientConfig.Service.Scheme, addr, appBinding.Namespace, port)
 
 	return leaderAddr, nil
-}
-
-func backupSecretName(appBinding *appcatalog.AppBinding) string {
-	return fmt.Sprintf("%s-%s-backup-token", appBinding.Name, appBinding.Namespace)
 }
 
 func randomString(n int) string {
