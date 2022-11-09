@@ -36,7 +36,7 @@ const (
 	AzureTenantID     = "AZURE_TENANT_ID"
 )
 
-func (opt *VaultOptions) newAzureCred(cred string) (*azidentity.DefaultAzureCredential, error) {
+func (opt *VaultOptions) newAzureCred(cred, tenantID string) (*azidentity.DefaultAzureCredential, error) {
 	secret, err := opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (opt *VaultOptions) newAzureCred(cred string) (*azidentity.DefaultAzureCred
 		}
 	}
 
-	if err = os.Setenv(AzureTenantID, opt.tenantID); err != nil {
+	if err = os.Setenv(AzureTenantID, tenantID); err != nil {
 		return nil, err
 	}
 
@@ -69,7 +69,7 @@ func (opt *VaultOptions) newAzureCred(cred string) (*azidentity.DefaultAzureCred
 }
 
 func (opt *VaultOptions) getAzureTokenKeys() (map[string]string, error) {
-	azCred, err := opt.newAzureCred(opt.credentialSecretRef)
+	azCred, err := opt.newAzureCred(opt.credentialSecretRef, opt.tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (opt *VaultOptions) setAzureTokenKeys(vs *vaultapi.VaultServer, keys map[st
 		credRef = mode.AzureKeyVault.CredentialSecretRef.Name
 	}
 
-	azCred, err := opt.newAzureCred(credRef)
+	azCred, err := opt.newAzureCred(credRef, mode.AzureKeyVault.TenantID)
 	if err != nil {
 		return err
 	}

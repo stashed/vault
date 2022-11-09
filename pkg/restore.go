@@ -303,9 +303,5 @@ func (opt *VaultOptions) migrateTokenKeys(vs *vaultapi.VaultServer) error {
 		return err
 	}
 
-	for k, v := range keys {
-		klog.Infoln("got keys: ", k, v)
-	}
-
 	return opt.setTokenKeys(vs, keys)
 }
