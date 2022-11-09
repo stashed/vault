@@ -78,7 +78,7 @@ type VaultOptions struct {
 
 	// vault related flags
 	force        bool
-	KeyPrefix    string
+	keyPrefix    string
 	secretShares int64
 	unsealMode   string
 
@@ -168,7 +168,7 @@ func (session *sessionWrapper) setTLSParameters(appBinding *appcatalog.AppBindin
 	return nil
 }
 
-func (session sessionWrapper) waitForVaultReady(vc *api.Client, waitTimeout int32) error {
+func (session sessionWrapper) waitForVaultReady(vc *api.Client, waitTimeout int32, appBinding *appcatalog.AppBinding) error {
 	klog.Infoln("Waiting for the vault to be ready....")
 
 	sh := shell.NewSession()
@@ -176,6 +176,13 @@ func (session sessionWrapper) waitForVaultReady(vc *api.Client, waitTimeout int3
 		sh.SetEnv(k, v)
 	}
 
+	url, err := appBinding.URL()
+	if err != nil {
+		return err
+	}
+
+	sh.SetEnv(EnvVaultAddress, url)
+	klog.Infoln("wait for vault ready env: ", sh.Env)
 	return wait.PollImmediate(5*time.Second, time.Duration(waitTimeout)*time.Second, func() (done bool, err error) {
 		resp, err := vc.Sys().Health()
 		if err != nil {

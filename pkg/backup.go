@@ -36,7 +36,6 @@ import (
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
-	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 	cs "kubevault.dev/apimachinery/client/clientset/versioned"
 )
 
@@ -201,6 +200,15 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
+	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if vs.Spec.Backend.Raft == nil {
+		return nil, errors.New("Backend must be Raft for backup snapshots")
+	}
+
 	if err = clearDir(opt.interimDataDir); err != nil {
 		return nil, err
 	}
@@ -217,32 +225,19 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
-	err = session.setVaultConnectionParameters(vaultClient, appBinding)
-	if err != nil {
-		return nil, err
-	}
-
 	err = session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir)
 	if err != nil {
 		return nil, err
 	}
 
-	err = session.waitForVaultReady(vaultClient, opt.waitTimeout)
+	err = session.waitForVaultReady(vaultClient, opt.waitTimeout, appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
+	err = session.setVaultConnectionParameters(vaultClient, appBinding)
 	if err != nil {
 		return nil, err
-	}
-
-	if vs.Spec.Backend.Raft == nil {
-		return nil, errors.New("Backend must be Raft for backup snapshots")
-	}
-
-	if vs.Status.Phase != vaultapi.VaultServerPhaseReady {
-		return nil, errors.New("VaultServer not ready")
 	}
 
 	klog.Infof("Try to backup for VaultServer %s/%s\n", vs.Namespace, vs.Name)

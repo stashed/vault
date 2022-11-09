@@ -76,9 +76,9 @@ func (opt *VaultOptions) getKeys() map[string]string {
 }
 
 func (opt *VaultOptions) unsealKeyName(id int) string {
-	return fmt.Sprintf("%s-unseal-key-%d", opt.KeyPrefix, id)
+	return fmt.Sprintf("%s-unseal-key-%d", opt.keyPrefix, id)
 }
 
 func (opt *VaultOptions) tokenName() string {
-	return fmt.Sprintf("%s-root-token", opt.KeyPrefix)
+	return fmt.Sprintf("%s-root-token", opt.keyPrefix)
 }

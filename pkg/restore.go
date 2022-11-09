@@ -196,6 +196,15 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
+	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if vs.Spec.Backend.Raft == nil {
+		return nil, errors.New("Backend must be Raft for restoring snapshots")
+	}
+
 	if err = clearDir(opt.interimDataDir); err != nil {
 		return nil, err
 	}
@@ -212,32 +221,19 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	err = session.setVaultConnectionParameters(vaultClient, appBinding)
-	if err != nil {
-		return nil, err
-	}
-
 	err = session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir)
 	if err != nil {
 		return nil, err
 	}
 
-	err = session.waitForVaultReady(vaultClient, opt.waitTimeout)
+	err = session.waitForVaultReady(vaultClient, opt.waitTimeout, appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
+	err = session.setVaultConnectionParameters(vaultClient, appBinding)
 	if err != nil {
 		return nil, err
-	}
-
-	if vs.Spec.Backend.Raft == nil {
-		return nil, errors.New("Backend must be Raft for restoring snapshots")
-	}
-
-	if vs.Status.Phase != vaultapi.VaultServerPhaseReady {
-		return nil, errors.New("VaultServer not ready")
 	}
 
 	klog.Infof("Try to restore for VaultServer %s/%s\n", vs.Namespace, vs.Name)
@@ -299,7 +295,7 @@ func (opt *VaultOptions) migrateTokenKeys(vs *vaultapi.VaultServer) error {
 		return err
 	}
 
-	opt.KeyPrefix = keyPrefix
+	opt.keyPrefix = keyPrefix
 
 	keys, err := opt.getTokenKeys()
 	if err != nil {
