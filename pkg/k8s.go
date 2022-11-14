@@ -19,40 +19,61 @@ package pkg
 import (
 	"context"
 
+	"github.com/pkg/errors"
+	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
-func (opt *VaultOptions) getK8sTokenKeys() (map[string]string, error) {
-	secret, err := opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Get(context.TODO(), opt.secretName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	keys := opt.getKeys()
-	for k, v := range secret.Data {
-		keys[k] = string(v)
-	}
-
-	return keys, nil
+type K8sStore struct {
+	kubeClient kubernetes.Interface
+	vs         *vaultapi.VaultServer
 }
 
-func (opt *VaultOptions) setK8sTokenKeys(vs *vaultapi.VaultServer, keys map[string]string) error {
-	mode := vs.Spec.Unsealer.Mode
-	var secretName string
-	if mode.KubernetesSecret != nil {
-		secretName = mode.KubernetesSecret.SecretName
+func (opt *VaultOptions) newK8sStore(vs *vaultapi.VaultServer) (*K8sStore, error) {
+	if vs == nil {
+		return nil, errors.New("vault server is nil")
 	}
 
-	secret, err := opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if opt.kubeClient == nil {
+		return nil, errors.New("kubeClient is nil")
+	}
+
+	return &K8sStore{
+		vs:         vs,
+		kubeClient: opt.kubeClient,
+	}, nil
+}
+
+func (store *K8sStore) Get(key string) (string, error) {
+	secretName := store.vs.Spec.Unsealer.Mode.KubernetesSecret.SecretName
+	secretNamespace := store.vs.Namespace
+	secret, err := store.kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
+		return "", err
+	}
+
+	if _, ok := secret.Data[key]; !ok {
+		return "", errors.Errorf("%s not found in secret %s/%s", key, secretNamespace, secretName)
+	}
+
+	return string(secret.Data[key]), nil
+}
+
+func (store *K8sStore) Set(key, value string) error {
+	secretName := store.vs.Spec.Unsealer.Mode.KubernetesSecret.SecretName
+	secretNamespace := store.vs.Namespace
+	secret, err := store.kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if err != nil {
+		if errors2.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
-	for key, value := range keys {
-		secret.Data[key] = []byte(value)
-	}
+	secret.Data[key] = []byte(value)
 
-	_, err = opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
+	_, err = store.kubeClient.CoreV1().Secrets(secretNamespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 	return err
 }

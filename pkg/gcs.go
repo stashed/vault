@@ -41,7 +41,25 @@ const (
 	GoogleApplicationCred = "GOOGLE_APPLICATION_CREDENTIALS"
 )
 
-func (opt *VaultOptions) newGcsClient(cred string) (*storage.Client, error) {
+type GcsStore struct {
+	vs     *vaultapi.VaultServer
+	client *storage.Client
+}
+
+func (opt *VaultOptions) newGcsStore(vs *vaultapi.VaultServer) (*GcsStore, error) {
+	if vs == nil {
+		return nil, errors.New("vault server is nil")
+	}
+
+	if opt.kubeClient == nil {
+		return nil, errors.New("kubeClient is nil")
+	}
+
+	var cred string
+	if vs.Spec.Unsealer.Mode.GoogleKmsGcs.CredentialSecretRef != nil {
+		cred = vs.Spec.Unsealer.Mode.GoogleKmsGcs.CredentialSecretRef.Name
+	}
+
 	secret, err := opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -70,89 +88,69 @@ func (opt *VaultOptions) newGcsClient(cred string) (*storage.Client, error) {
 		return nil, err
 	}
 
-	return client, nil
+	return &GcsStore{
+		vs:     vs,
+		client: client,
+	}, nil
 }
 
-func (opt *VaultOptions) getGcsTokenKeys() (map[string]string, error) {
-	client, err := opt.newGcsClient(opt.credentialSecretRef)
+func (store *GcsStore) Get(key string) (string, error) {
+	googleKmsGcsSpec := store.vs.Spec.Unsealer.Mode.GoogleKmsGcs
+	rc, err := store.client.Bucket(googleKmsGcsSpec.Bucket).Object(key).NewReader(context.TODO())
 	if err != nil {
-		return nil, err
+		return "", err
+	}
+	defer rc.Close()
+
+	body, err := io.ReadAll(rc)
+	if err != nil {
+		return "", err
 	}
 
-	keys := opt.getKeys()
-	for key := range keys {
-		rc, err := client.Bucket(opt.bucket).Object(key).NewReader(context.TODO())
-		if err != nil {
-			return nil, err
-		}
-		rc.Close()
+	name := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
+		googleKmsGcsSpec.KmsProject, googleKmsGcsSpec.KmsLocation,
+		googleKmsGcsSpec.KmsKeyRing, googleKmsGcsSpec.KmsCryptoKey)
 
-		body, err := io.ReadAll(rc)
-		if err != nil {
-			return nil, err
-		}
-
-		name := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
-			opt.kmsProject, opt.kmsLocation,
-			opt.kmsKeyRing, opt.kmsCryptoKey)
-
-		decryptedToken, err := decryptSymmetric(name, body)
-		if err != nil {
-			return nil, err
-		}
-
-		keys[key] = decryptedToken
+	decryptedToken, err := decryptSymmetric(name, body)
+	if err != nil {
+		return "", err
 	}
 
-	return keys, nil
+	return decryptedToken, nil
 }
 
-func (opt *VaultOptions) setGcsTokenKeys(vs *vaultapi.VaultServer, keys map[string]string) error {
-	mode := vs.Spec.Unsealer.Mode
-
-	var credRef string
-	if mode.GoogleKmsGcs.CredentialSecretRef != nil {
-		credRef = mode.GoogleKmsGcs.CredentialSecretRef.Name
-	}
-
-	client, err := opt.newGcsClient(credRef)
-	if err != nil {
-		return err
-	}
-
+func (store *GcsStore) Set(key, value string) error {
 	kmsService, err := cloudkms.NewService(context.TODO(), option.WithScopes(cloudkms.CloudPlatformScope))
 	if err != nil {
 		return errors.Errorf("error creating google kms service client: %s", err.Error())
 	}
 
+	googleKmsGcsSpec := store.vs.Spec.Unsealer.Mode.GoogleKmsGcs
+
 	name := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
-		mode.GoogleKmsGcs.KmsProject, mode.GoogleKmsGcs.KmsLocation,
-		mode.GoogleKmsGcs.KmsKeyRing, mode.GoogleKmsGcs.KmsCryptoKey)
+		googleKmsGcsSpec.KmsProject, googleKmsGcsSpec.KmsLocation,
+		googleKmsGcsSpec.KmsKeyRing, googleKmsGcsSpec.KmsCryptoKey)
 
-	for key, value := range keys {
-		resp, err := kmsService.Projects.Locations.KeyRings.CryptoKeys.Encrypt(name, &cloudkms.EncryptRequest{
-			Plaintext: base64.StdEncoding.EncodeToString([]byte(value)),
-		}).Do()
-		if err != nil {
-			return errors.Errorf("error encrypting data: %s", err.Error())
-		}
-
-		cipherText, err := base64.StdEncoding.DecodeString(resp.Ciphertext)
-		if err != nil {
-			return err
-		}
-
-		w := client.Bucket(mode.GoogleKmsGcs.Bucket).Object(key).NewWriter(context.TODO())
-		if _, err := w.Write(cipherText); err != nil {
-			return fmt.Errorf("error writing key '%s' to gcs bucket '%s'", key, mode.GoogleKmsGcs.Bucket)
-		}
-
-		if err = w.Close(); err != nil {
-			return err
-		}
+	resp, err := kmsService.Projects.Locations.KeyRings.CryptoKeys.Encrypt(name, &cloudkms.EncryptRequest{
+		Plaintext: base64.StdEncoding.EncodeToString([]byte(value)),
+	}).Do()
+	if err != nil {
+		return errors.Errorf("error encrypting data: %s", err.Error())
 	}
 
-	return nil
+	cipherText, err := base64.StdEncoding.DecodeString(resp.Ciphertext)
+	if err != nil {
+		return err
+	}
+
+	bucket := store.vs.Spec.Unsealer.Mode.GoogleKmsGcs.Bucket
+
+	w := store.client.Bucket(bucket).Object(key).NewWriter(context.TODO())
+	if _, err := w.Write(cipherText); err != nil {
+		return fmt.Errorf("error writing key '%s' to gcs bucket '%s'", key, bucket)
+	}
+
+	return w.Close()
 }
 
 func decryptSymmetric(name string, ciphertext []byte) (string, error) {

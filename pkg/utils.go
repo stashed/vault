@@ -78,34 +78,8 @@ type VaultOptions struct {
 	interimDataDir string
 
 	// vault related flags
-	force        bool
-	keyPrefix    string
-	secretShares int64
-	unsealMode   string
-
-	// common
-	credentialSecretRef string
-
-	// for google kms gcs
-	kmsCryptoKey string
-	kmsKeyRing   string
-	kmsLocation  string
-	kmsProject   string
-	bucket       string
-
-	// for k8s secret
-	secretName string
-
-	// for aws kms
-	kmsKeyID     string
-	ssmKeyPrefix string
-	region       string
-	endpoint     string
-
-	// for azure key vault
-	vaultBaseURL string
-	cloud        string
-	tenantID     string
+	force     bool
+	keyPrefix string
 }
 
 type BackupToken struct {
@@ -289,4 +263,12 @@ func (opt *VaultOptions) getKeyPrefix() (string, error) {
 	}
 
 	return keyPrefix, nil
+}
+
+func (opt *VaultOptions) unsealKeyName(id int) string {
+	return fmt.Sprintf("%s-unseal-key-%d", opt.keyPrefix, id)
+}
+
+func (opt *VaultOptions) tokenName() string {
+	return fmt.Sprintf("%s-root-token", opt.keyPrefix)
 }

@@ -18,6 +18,8 @@ package pkg
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"path/filepath"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
@@ -36,6 +38,7 @@ import (
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
+	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 	cs "kubevault.dev/apimachinery/client/clientset/versioned"
 )
 
@@ -158,6 +161,7 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 	var err error
 	err = license.CheckLicenseEndpoint(opt.config, licenseApiService, SupportedProducts)
 	if err != nil {
+		klog.Infoln("license: ", err.Error())
 		return nil, err
 	}
 
@@ -247,6 +251,10 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
+	if err := opt.writeVaultTokenKeys(vs); err != nil {
+		return nil, err
+	}
+
 	opt.backupOptions.BackupPaths = []string{opt.interimDataDir}
 	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
 	if err != nil {
@@ -267,5 +275,52 @@ func (opt *VaultOptions) saveVaultSnapshot(session *sessionWrapper) error {
 		return err
 	}
 
+	klog.Infoln("snapshot saved successfully")
+	return nil
+}
+
+func (opt *VaultOptions) writeVaultTokenKeys(vs *vaultapi.VaultServer) error {
+	keyPrefix, err := opt.getKeyPrefix()
+	if err != nil {
+		return err
+	}
+	opt.keyPrefix = keyPrefix
+
+	store, err := opt.newStore(vs)
+	if err != nil {
+		return err
+	}
+
+	var keys []string
+	keys = append(keys, opt.tokenName())
+	for i := 0; i < int(vs.Spec.Unsealer.SecretShares); i++ {
+		keys = append(keys, opt.unsealKeyName(i))
+	}
+
+	for _, key := range keys {
+		value, err := store.Get(key)
+		if err != nil {
+			klog.Errorf("failed to get key %s with %s\n", key, err.Error())
+			return err
+		}
+
+		if err := opt.write(key, value); err != nil {
+			klog.Errorf("failed to write key %s with %s\n", key, err.Error())
+		}
+	}
+
+	klog.Infoln("Successfully stored unseal keys & root token")
+	return nil
+}
+
+func (opt *VaultOptions) write(key, value string) error {
+	byteStreams, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	if err = os.WriteFile(filepath.Join(opt.interimDataDir, key), byteStreams, 0o644); err != nil {
+		return err
+	}
 	return nil
 }

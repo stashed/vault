@@ -36,8 +36,25 @@ const (
 	AzureTenantID     = "AZURE_TENANT_ID"
 )
 
-func (opt *VaultOptions) newAzureCred(cred, tenantID string) (*azidentity.DefaultAzureCredential, error) {
-	secret, err := opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Get(context.TODO(), cred, metav1.GetOptions{})
+type AzureStore struct {
+	cred *azidentity.DefaultAzureCredential
+	vs   *vaultapi.VaultServer
+}
+
+func (opt *VaultOptions) newAzureStore(vs *vaultapi.VaultServer) (*AzureStore, error) {
+	if vs == nil {
+		return nil, errors.New("vault server is nil")
+	}
+
+	if opt.kubeClient == nil {
+		return nil, errors.New("kubeClient is nil")
+	}
+
+	var cred string
+	if vs.Spec.Unsealer.Mode.AzureKeyVault.CredentialSecretRef != nil {
+		cred = vs.Spec.Unsealer.Mode.AzureKeyVault.CredentialSecretRef.Name
+	}
+	secret, err := opt.kubeClient.CoreV1().Secrets(vs.Namespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -56,69 +73,50 @@ func (opt *VaultOptions) newAzureCred(cred, tenantID string) (*azidentity.Defaul
 		}
 	}
 
-	if err = os.Setenv(AzureTenantID, tenantID); err != nil {
+	if err := os.Setenv(AzureTenantID, vs.Spec.Unsealer.Mode.AzureKeyVault.TenantID); err != nil {
 		return nil, err
 	}
 
-	azCred, err := azidentity.NewDefaultAzureCredential(nil)
+	azcred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return azCred, nil
+	return &AzureStore{
+		cred: azcred,
+		vs:   vs,
+	}, nil
 }
 
-func (opt *VaultOptions) getAzureTokenKeys() (map[string]string, error) {
-	azCred, err := opt.newAzureCred(opt.credentialSecretRef, opt.tenantID)
+func (store *AzureStore) Get(key string) (string, error) {
+	vaultBaseUrl := store.vs.Spec.Unsealer.Mode.AzureKeyVault.VaultBaseURL
+	client := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
+
+	resp, err := client.GetSecret(context.Background(), strings.Replace(key, ".", "-", -1), "", nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	client := azsecrets.NewClient(opt.vaultBaseURL, azCred, nil)
-	keys := opt.getKeys()
-	for key := range keys {
-		resp, err := client.GetSecret(context.Background(), strings.Replace(key, ".", "-", -1), "", nil)
-		if err != nil {
-			return nil, err
-		}
-
-		decoded, err := base64.StdEncoding.DecodeString(*resp.Value)
-		if err != nil {
-			return nil, err
-		}
-
-		keys[key] = string(decoded)
+	decoded, err := base64.StdEncoding.DecodeString(*resp.Value)
+	if err != nil {
+		return "", err
 	}
 
-	return keys, nil
+	return string(decoded), nil
 }
 
-func (opt *VaultOptions) setAzureTokenKeys(vs *vaultapi.VaultServer, keys map[string]string) error {
-	mode := vs.Spec.Unsealer.Mode
+func (store *AzureStore) Set(key, value string) error {
+	key = strings.Replace(key, ".", "-", -1)
 
-	var credRef string
-	if mode.AzureKeyVault.CredentialSecretRef != nil {
-		credRef = mode.AzureKeyVault.CredentialSecretRef.Name
-	}
+	vaultBaseUrl := store.vs.Spec.Unsealer.Mode.AzureKeyVault.VaultBaseURL
+	client := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
 
-	azCred, err := opt.newAzureCred(credRef, mode.AzureKeyVault.TenantID)
+	_, err := client.SetSecret(context.TODO(), key, azsecrets.SetSecretParameters{
+		Value:       pointer.StringP(base64.StdEncoding.EncodeToString([]byte(value))),
+		ContentType: pointer.StringP("password"),
+	}, nil)
 	if err != nil {
-		return err
-	}
-
-	for key, value := range keys {
-		key = strings.Replace(key, ".", "-", -1)
-
-		vaultBaseUrl := vs.Spec.Unsealer.Mode.AzureKeyVault.VaultBaseURL
-		client := azsecrets.NewClient(vaultBaseUrl, azCred, nil)
-
-		_, err := client.SetSecret(context.TODO(), key, azsecrets.SetSecretParameters{
-			Value:       pointer.StringP(base64.StdEncoding.EncodeToString([]byte(value))),
-			ContentType: pointer.StringP("password"),
-		}, nil)
-		if err != nil {
-			return errors.Wrap(err, "unable to set secrets in key vault")
-		}
+		return errors.Wrap(err, "unable to set secrets in key vault")
 	}
 
 	return nil

@@ -35,7 +35,26 @@ const (
 	AWSSecretKey = "AWS_SECRET_ACCESS_KEY"
 )
 
-func (opt *VaultOptions) newAwsSession(cred, region string) (*session.Session, error) {
+type AwsKmsStore struct {
+	ssmService *ssm.SSM
+	kmsService *kms.KMS
+	vs         *vaultapi.VaultServer
+}
+
+func (opt *VaultOptions) newAwsKmsStore(vs *vaultapi.VaultServer) (*AwsKmsStore, error) {
+	if vs == nil {
+		return nil, errors.New("vault server is nil")
+	}
+
+	if opt.kubeClient == nil {
+		return nil, errors.New("kubeClient is nil")
+	}
+
+	var cred string
+	if vs.Spec.Unsealer.Mode.AwsKmsSsm.CredentialSecretRef != nil {
+		cred = vs.Spec.Unsealer.Mode.AwsKmsSsm.CredentialSecretRef.Name
+	}
+
 	secret, err := opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -60,110 +79,81 @@ func (opt *VaultOptions) newAwsSession(cred, region string) (*session.Session, e
 			f := true
 			return &f
 		}(),
-		Region: aws.String(region),
+		Region: aws.String(vs.Spec.Unsealer.Mode.AwsKmsSsm.Region),
 	},
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create session")
 	}
 
-	return sess, nil
+	return &AwsKmsStore{
+		kmsService: kms.New(sess),
+		ssmService: ssm.New(sess),
+		vs:         vs,
+	}, nil
 }
 
-func (opt *VaultOptions) getAwsTokenKeys() (map[string]string, error) {
-	sess, err := opt.newAwsSession(opt.credentialSecretRef, opt.region)
+func (store *AwsKmsStore) Get(key string) (string, error) {
+	req := &ssm.GetParametersInput{
+		Names: []*string{
+			aws.String(key),
+		},
+		WithDecryption: aws.Bool(false),
+	}
+
+	params, err := store.ssmService.GetParameters(req)
 	if err != nil {
-		return nil, err
+		return "", errors.Wrap(err, "failed to get key from ssm")
 	}
 
-	kmsService := kms.New(sess)
-	ssmService := ssm.New(sess)
-
-	keys := opt.getKeys()
-	for key := range keys {
-		req := &ssm.GetParametersInput{
-			Names: []*string{
-				aws.String(key),
-			},
-			WithDecryption: aws.Bool(false),
-		}
-
-		params, err := ssmService.GetParameters(req)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get key from ssm")
-		}
-
-		if len(params.Parameters) == 0 {
-			return nil, errors.New("failed to get key from ssm; empty response")
-		}
-
-		// Since len of the params is greater than zero
-		sDec, err := base64.StdEncoding.DecodeString(*params.Parameters[0].Value)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to base64-decode")
-		}
-
-		decryptOutput, err := kmsService.Decrypt(&kms.DecryptInput{
-			CiphertextBlob: sDec,
-			EncryptionContext: map[string]*string{
-				"Tool": aws.String("vault-unsealer"),
-			},
-			GrantTokens: []*string{},
-			KeyId:       aws.String(opt.kmsKeyID),
-		})
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to kms decrypt")
-		}
-
-		keys[key] = string(decryptOutput.Plaintext)
+	if len(params.Parameters) == 0 {
+		return "", errors.New("failed to get key from ssm; empty response")
 	}
 
-	return keys, nil
+	sDec, err := base64.StdEncoding.DecodeString(*params.Parameters[0].Value)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to base64-decode")
+	}
+
+	awsKmsSsmSpec := store.vs.Spec.Unsealer.Mode.AwsKmsSsm
+	decryptOutput, err := store.kmsService.Decrypt(&kms.DecryptInput{
+		CiphertextBlob: sDec,
+		EncryptionContext: map[string]*string{
+			"Tool": aws.String("vault-unsealer"),
+		},
+		GrantTokens: []*string{},
+		KeyId:       aws.String(awsKmsSsmSpec.KmsKeyID),
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "failed to kms decrypt")
+	}
+
+	return string(decryptOutput.Plaintext), nil
 }
 
-func (opt *VaultOptions) setAwsTokenKeys(vs *vaultapi.VaultServer, keys map[string]string) error {
-	mode := vs.Spec.Unsealer.Mode
+func (store *AwsKmsStore) Set(key, value string) error {
+	awsKmsSsmSpec := store.vs.Spec.Unsealer.Mode.AwsKmsSsm
 
-	var credRef string
-	if mode.AwsKmsSsm.CredentialSecretRef != nil {
-		credRef = mode.AwsKmsSsm.CredentialSecretRef.Name
-	}
-
-	sess, err := opt.newAwsSession(credRef, mode.AwsKmsSsm.Region)
+	out, err := store.kmsService.Encrypt(&kms.EncryptInput{
+		KeyId:     aws.String(awsKmsSsmSpec.KmsKeyID),
+		Plaintext: []byte(value),
+		EncryptionContext: map[string]*string{
+			"Tool": aws.String("vault-unsealer"),
+		},
+		GrantTokens: []*string{},
+	})
 	if err != nil {
 		return err
 	}
 
-	kmsService := kms.New(sess)
-	ssmService := ssm.New(sess)
-
-	awsKmsSsmSpec := vs.Spec.Unsealer.Mode.AwsKmsSsm
-
-	for key, value := range keys {
-		out, err := kmsService.Encrypt(&kms.EncryptInput{
-			KeyId:     aws.String(awsKmsSsmSpec.KmsKeyID),
-			Plaintext: []byte(value),
-			EncryptionContext: map[string]*string{
-				"Tool": aws.String("vault-unsealer"),
-			},
-			GrantTokens: []*string{},
-		})
-		if err != nil {
-			return err
-		}
-
-		req := &ssm.PutParameterInput{
-			Description: aws.String("vault-unsealer"),
-			Name:        aws.String(key),
-			Overwrite:   aws.Bool(true),
-			Type:        aws.String("String"),
-			Value:       aws.String(base64.StdEncoding.EncodeToString(out.CiphertextBlob)),
-		}
-
-		if _, err = ssmService.PutParameter(req); err != nil {
-			return err
-		}
+	req := &ssm.PutParameterInput{
+		Description: aws.String("vault-unsealer"),
+		Name:        aws.String(key),
+		Overwrite:   aws.Bool(true),
+		Type:        aws.String("String"),
+		Value:       aws.String(base64.StdEncoding.EncodeToString(out.CiphertextBlob)),
 	}
 
-	return nil
+	_, err = store.ssmService.PutParameter(req)
+	return err
 }

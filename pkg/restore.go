@@ -15,6 +15,8 @@ package pkg
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"path/filepath"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
@@ -140,30 +142,6 @@ func NewCmdRestore() *cobra.Command {
 
 	// vault related flags
 	cmd.Flags().BoolVar(&opt.force, "force", opt.force, "Specify whether to force restore or not")
-	cmd.Flags().Int64Var(&opt.secretShares, "secret-shares", opt.secretShares, "number of secret shares")
-	cmd.Flags().StringVar(&opt.unsealMode, "unseal-mode", opt.unsealMode, "specifies the mode of old token & unseal keys")
-
-	// for unseal mode google kms gcs
-	cmd.Flags().StringVar(&opt.kmsCryptoKey, "kms-crypto-key", opt.kmsCryptoKey, "crypto key")
-	cmd.Flags().StringVar(&opt.kmsKeyRing, "kms-key-ring", opt.kmsKeyRing, "key ring")
-	cmd.Flags().StringVar(&opt.kmsLocation, "kms-location", opt.kmsLocation, "key ring")
-	cmd.Flags().StringVar(&opt.kmsProject, "kms-project", opt.kmsProject, "kms project")
-	cmd.Flags().StringVar(&opt.bucket, "vault-bucket", opt.bucket, "bucket")
-	cmd.Flags().StringVar(&opt.credentialSecretRef, "credential-secret-ref", opt.credentialSecretRef, "credential secret")
-
-	// for unseal mode kubernetes secret
-	cmd.Flags().StringVar(&opt.secretName, "secret-name", opt.secretName, "k8s secret name where previous unseal keys & token are stored")
-
-	// for unseal mode aws kms
-	cmd.Flags().StringVar(&opt.kmsKeyID, "kms-key-id", opt.kmsKeyID, "kms key id")
-	cmd.Flags().StringVar(&opt.ssmKeyPrefix, "ssm-key-prefix", opt.ssmKeyPrefix, "ssm key prefix")
-	cmd.Flags().StringVar(&opt.region, "vault-region", opt.region, "vault region")
-	cmd.Flags().StringVar(&opt.endpoint, "vault-endpoint", opt.endpoint, "vault endpoint")
-
-	// for unseal mode azure key vault
-	cmd.Flags().StringVar(&opt.vaultBaseURL, "vault-base-url", opt.vaultBaseURL, "vault base url")
-	cmd.Flags().StringVar(&opt.cloud, "cloud", opt.cloud, "cloud")
-	cmd.Flags().StringVar(&opt.tenantID, "tenant-id", opt.tenantID, "tenant ID")
 
 	return cmd
 }
@@ -238,17 +216,6 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 
 	klog.Infof("Try to restore for VaultServer %s/%s\n", vs.Namespace, vs.Name)
 
-	// restore snapshot on a different Vault cluster, -force, previous unseal keys are required
-	if opt.force {
-		klog.Infof("Try to migrate keys from %s\n", opt.unsealMode)
-		err = opt.migrateTokenKeys(vs)
-		if err != nil {
-			klog.Errorln("Failed to migrate keys ", err.Error())
-			return nil, err
-		}
-		klog.Infoln("Successfully migrated keys")
-	}
-
 	opt.restoreOptions.RestorePaths = []string{opt.interimDataDir}
 
 	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
@@ -264,6 +231,14 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 	err = opt.restoreVaultSnapshot(session)
 	if err != nil {
 		return nil, err
+	}
+
+	if opt.force {
+		klog.Infoln("Potentially different VaultServer. Apply -force to restore snapshot.")
+		if err := opt.setVaultTokenKeys(vs); err != nil {
+			return nil, err
+		}
+		klog.Infoln("Successfully migrated old unseal keys & root token")
 	}
 
 	return restoreOutput, nil
@@ -287,21 +262,53 @@ func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 		return err
 	}
 
+	klog.Infoln("snapshot restored successfully")
 	return nil
 }
 
-func (opt *VaultOptions) migrateTokenKeys(vs *vaultapi.VaultServer) error {
+func (opt *VaultOptions) setVaultTokenKeys(vs *vaultapi.VaultServer) error {
 	keyPrefix, err := opt.getKeyPrefix()
 	if err != nil {
 		return err
 	}
-
 	opt.keyPrefix = keyPrefix
 
-	keys, err := opt.getTokenKeys()
+	store, err := opt.newStore(vs)
 	if err != nil {
 		return err
 	}
 
-	return opt.setTokenKeys(vs, keys)
+	var keys []string
+	keys = append(keys, opt.tokenName())
+	for i := 0; i < int(vs.Spec.Unsealer.SecretShares); i++ {
+		keys = append(keys, opt.unsealKeyName(i))
+	}
+
+	for _, key := range keys {
+		value, err := opt.read(key)
+		if err != nil {
+			klog.Errorf("failed to read key %s with %s\n", key, err.Error())
+			return err
+		}
+
+		if err := store.Set(key, value); err != nil {
+			klog.Errorf("failed to set key %s with %s\n", key, err.Error())
+		}
+	}
+
+	return nil
+}
+
+func (opt *VaultOptions) read(key string) (string, error) {
+	byteStreams, err := os.ReadFile(filepath.Join(opt.interimDataDir, key))
+	if err != nil {
+		return "", err
+	}
+
+	var data string
+	if err := json.Unmarshal(byteStreams, &data); err != nil {
+		return "", err
+	}
+
+	return data, nil
 }

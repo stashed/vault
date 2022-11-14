@@ -17,68 +17,32 @@ limitations under the License.
 package pkg
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
-const (
-	UnsealModeGoogleKmsGcs     = "googleKmsGcs"
-	UnsealModeKubernetesSecret = "kubernetesSecret"
-	UnsealModeAwsKmsSsm        = "awsKmsSsm"
-	UnsealModeAzureKeyVault    = "azureKeyVault"
-)
+type StoreInterface interface {
+	Get(key string) (string, error)
+	Set(key, value string) error
+}
 
-func (opt *VaultOptions) getTokenKeys() (map[string]string, error) {
-	switch opt.unsealMode {
-	case UnsealModeGoogleKmsGcs:
-		return opt.getGcsTokenKeys()
-	case UnsealModeKubernetesSecret:
-		return opt.getK8sTokenKeys()
-	case UnsealModeAwsKmsSsm:
-		return opt.getAwsTokenKeys()
-	case UnsealModeAzureKeyVault:
-		return opt.getAzureTokenKeys()
+func (opt *VaultOptions) newStore(vs *vaultapi.VaultServer) (StoreInterface, error) {
+	if vs == nil {
+		return nil, errors.New("vaultserver is nil")
+	}
+
+	mode := vs.Spec.Unsealer.Mode
+	switch true {
+
+	case mode.GoogleKmsGcs != nil:
+		return opt.newGcsStore(vs)
+	case mode.AwsKmsSsm != nil:
+		return opt.newAwsKmsStore(vs)
+	case mode.AzureKeyVault != nil:
+		return opt.newAzureStore(vs)
+	case mode.KubernetesSecret != nil:
+		return opt.newK8sStore(vs)
 	}
 
 	return nil, errors.New("unknown unseal mode")
-}
-
-func (opt *VaultOptions) setTokenKeys(vs *vaultapi.VaultServer, keys map[string]string) error {
-	mode := vs.Spec.Unsealer.Mode
-	switch true {
-	case mode.GoogleKmsGcs != nil:
-		return opt.setGcsTokenKeys(vs, keys)
-	case mode.KubernetesSecret != nil:
-		return opt.setK8sTokenKeys(vs, keys)
-	case mode.AwsKmsSsm != nil:
-		return opt.setAwsTokenKeys(vs, keys)
-	case mode.AzureKeyVault != nil:
-		return opt.setAzureTokenKeys(vs, keys)
-	}
-
-	return errors.New("unknown unseal mode")
-}
-
-func (opt *VaultOptions) getKeys() map[string]string {
-	keys := make(map[string]string)
-
-	var key string
-	key = opt.tokenName()
-	keys[key] = ""
-	for id := 0; int64(id) < opt.secretShares; id++ {
-		key = opt.unsealKeyName(id)
-		keys[key] = ""
-	}
-
-	return keys
-}
-
-func (opt *VaultOptions) unsealKeyName(id int) string {
-	return fmt.Sprintf("%s-unseal-key-%d", opt.keyPrefix, id)
-}
-
-func (opt *VaultOptions) tokenName() string {
-	return fmt.Sprintf("%s-root-token", opt.keyPrefix)
 }
