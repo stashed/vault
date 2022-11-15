@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pkg
+package gcs
 
 import (
 	"context"
@@ -22,8 +22,10 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"time"
 
 	kmsv1 "cloud.google.com/go/kms/apiv1"
 	"cloud.google.com/go/kms/apiv1/kmspb"
@@ -33,6 +35,7 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
@@ -46,12 +49,12 @@ type GcsStore struct {
 	client *storage.Client
 }
 
-func (opt *VaultOptions) newGcsStore(vs *vaultapi.VaultServer) (*GcsStore, error) {
+func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*GcsStore, error) {
 	if vs == nil {
 		return nil, errors.New("vault server is nil")
 	}
 
-	if opt.kubeClient == nil {
+	if kc == nil {
 		return nil, errors.New("kubeClient is nil")
 	}
 
@@ -60,7 +63,7 @@ func (opt *VaultOptions) newGcsStore(vs *vaultapi.VaultServer) (*GcsStore, error
 		cred = vs.Spec.Unsealer.Mode.GoogleKmsGcs.CredentialSecretRef.Name
 	}
 
-	secret, err := opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Get(context.TODO(), cred, metav1.GetOptions{})
+	secret, err := kc.CoreV1().Secrets(vs.Namespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -182,4 +185,14 @@ func decryptSymmetric(name string, ciphertext []byte) (string, error) {
 	}
 
 	return string(result.Plaintext), nil
+}
+
+func randomString(n int) string {
+	rand.Seed(time.Now().Unix())
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	s := make([]rune, n)
+	for i := range s {
+		s[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(s)
 }

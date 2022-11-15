@@ -26,6 +26,7 @@ import (
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
 	"stash.appscode.dev/apimachinery/pkg/restic"
 	api_util "stash.appscode.dev/apimachinery/pkg/util"
+	"stash.appscode.dev/vault/pkg/store"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -161,7 +162,6 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 	var err error
 	err = license.CheckLicenseEndpoint(opt.config, licenseApiService, SupportedProducts)
 	if err != nil {
-		klog.Infoln("license: ", err.Error())
 		return nil, err
 	}
 
@@ -286,7 +286,7 @@ func (opt *VaultOptions) writeVaultTokenKeys(vs *vaultapi.VaultServer) error {
 	}
 	opt.keyPrefix = keyPrefix
 
-	store, err := opt.newStore(vs)
+	st, err := store.NewStore(opt.kubeClient, vs)
 	if err != nil {
 		return err
 	}
@@ -298,7 +298,7 @@ func (opt *VaultOptions) writeVaultTokenKeys(vs *vaultapi.VaultServer) error {
 	}
 
 	for _, key := range keys {
-		value, err := store.Get(key)
+		value, err := st.Get(key)
 		if err != nil {
 			klog.Errorf("failed to get key %s with %s\n", key, err.Error())
 			return err

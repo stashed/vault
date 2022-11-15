@@ -14,34 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pkg
+package store
 
 import (
+	"stash.appscode.dev/vault/pkg/store/aws"
+	"stash.appscode.dev/vault/pkg/store/azure"
+	"stash.appscode.dev/vault/pkg/store/gcs"
+	"stash.appscode.dev/vault/pkg/store/k8s"
+
 	"github.com/pkg/errors"
+	"k8s.io/client-go/kubernetes"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
-type StoreInterface interface {
-	Get(key string) (string, error)
-	Set(key, value string) error
-}
-
-func (opt *VaultOptions) newStore(vs *vaultapi.VaultServer) (StoreInterface, error) {
+func NewStore(kc kubernetes.Interface, vs *vaultapi.VaultServer) (StoreInterface, error) {
 	if vs == nil {
 		return nil, errors.New("vaultserver is nil")
+	}
+
+	if kc == nil {
+		return nil, errors.New("kubeclient is nil")
 	}
 
 	mode := vs.Spec.Unsealer.Mode
 	switch true {
 
 	case mode.GoogleKmsGcs != nil:
-		return opt.newGcsStore(vs)
+		return gcs.New(kc, vs)
 	case mode.AwsKmsSsm != nil:
-		return opt.newAwsKmsStore(vs)
+		return aws.New(kc, vs)
 	case mode.AzureKeyVault != nil:
-		return opt.newAzureStore(vs)
+		return azure.New(kc, vs)
 	case mode.KubernetesSecret != nil:
-		return opt.newK8sStore(vs)
+		return k8s.New(kc, vs)
 	}
 
 	return nil, errors.New("unknown unseal mode")

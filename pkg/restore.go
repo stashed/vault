@@ -21,6 +21,7 @@ import (
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	"stash.appscode.dev/apimachinery/pkg/restic"
+	"stash.appscode.dev/vault/pkg/store"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -273,7 +274,7 @@ func (opt *VaultOptions) setVaultTokenKeys(vs *vaultapi.VaultServer) error {
 	}
 	opt.keyPrefix = keyPrefix
 
-	store, err := opt.newStore(vs)
+	st, err := store.NewStore(opt.kubeClient, vs)
 	if err != nil {
 		return err
 	}
@@ -291,7 +292,7 @@ func (opt *VaultOptions) setVaultTokenKeys(vs *vaultapi.VaultServer) error {
 			return err
 		}
 
-		if err := store.Set(key, value); err != nil {
+		if err := st.Set(key, value); err != nil {
 			klog.Errorf("failed to set key %s with %s\n", key, err.Error())
 		}
 	}

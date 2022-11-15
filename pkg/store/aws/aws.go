@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pkg
+package aws
 
 import (
 	"context"
@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
@@ -41,12 +42,12 @@ type AwsKmsStore struct {
 	vs         *vaultapi.VaultServer
 }
 
-func (opt *VaultOptions) newAwsKmsStore(vs *vaultapi.VaultServer) (*AwsKmsStore, error) {
+func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*AwsKmsStore, error) {
 	if vs == nil {
 		return nil, errors.New("vault server is nil")
 	}
 
-	if opt.kubeClient == nil {
+	if kc == nil {
 		return nil, errors.New("kubeClient is nil")
 	}
 
@@ -55,7 +56,7 @@ func (opt *VaultOptions) newAwsKmsStore(vs *vaultapi.VaultServer) (*AwsKmsStore,
 		cred = vs.Spec.Unsealer.Mode.AwsKmsSsm.CredentialSecretRef.Name
 	}
 
-	secret, err := opt.kubeClient.CoreV1().Secrets(opt.appBindingNamespace).Get(context.TODO(), cred, metav1.GetOptions{})
+	secret, err := kc.CoreV1().Secrets(vs.Namespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

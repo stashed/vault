@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -232,16 +231,6 @@ func getLeaderAddress(vc *api.Client, appBinding *appcatalog.AppBinding) (string
 	leaderAddr := fmt.Sprintf("%s://%s.%s.svc:%d", appBinding.Spec.ClientConfig.Service.Scheme, addr, appBinding.Namespace, port)
 
 	return leaderAddr, nil
-}
-
-func randomString(n int) string {
-	rand.Seed(time.Now().Unix())
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-	s := make([]rune, n)
-	for i := range s {
-		s[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(s)
 }
 
 func (opt *VaultOptions) getKeyPrefix() (string, error) {

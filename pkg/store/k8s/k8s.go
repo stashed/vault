@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pkg
+package k8s
 
 import (
 	"context"
@@ -27,29 +27,29 @@ import (
 )
 
 type K8sStore struct {
-	kubeClient kubernetes.Interface
-	vs         *vaultapi.VaultServer
+	kc kubernetes.Interface
+	vs *vaultapi.VaultServer
 }
 
-func (opt *VaultOptions) newK8sStore(vs *vaultapi.VaultServer) (*K8sStore, error) {
+func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*K8sStore, error) {
 	if vs == nil {
 		return nil, errors.New("vault server is nil")
 	}
 
-	if opt.kubeClient == nil {
+	if kc == nil {
 		return nil, errors.New("kubeClient is nil")
 	}
 
 	return &K8sStore{
-		vs:         vs,
-		kubeClient: opt.kubeClient,
+		vs: vs,
+		kc: kc,
 	}, nil
 }
 
 func (store *K8sStore) Get(key string) (string, error) {
 	secretName := store.vs.Spec.Unsealer.Mode.KubernetesSecret.SecretName
 	secretNamespace := store.vs.Namespace
-	secret, err := store.kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	secret, err := store.kc.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -64,7 +64,7 @@ func (store *K8sStore) Get(key string) (string, error) {
 func (store *K8sStore) Set(key, value string) error {
 	secretName := store.vs.Spec.Unsealer.Mode.KubernetesSecret.SecretName
 	secretNamespace := store.vs.Namespace
-	secret, err := store.kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	secret, err := store.kc.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		if errors2.IsNotFound(err) {
 			return nil
@@ -74,6 +74,6 @@ func (store *K8sStore) Set(key, value string) error {
 
 	secret.Data[key] = []byte(value)
 
-	_, err = store.kubeClient.CoreV1().Secrets(secretNamespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
+	_, err = store.kc.CoreV1().Secrets(secretNamespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 	return err
 }
