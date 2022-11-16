@@ -73,10 +73,13 @@ func NewCmdRestore() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
 			opt.catalogClient, err = appcatalog_cs.NewForConfig(config)
 			if err != nil {
 				return err
 			}
+
+			// create the client for vaultserver
 			opt.extClient, err = cs.NewForConfig(config)
 			if err != nil {
 				return err
@@ -142,6 +145,7 @@ func NewCmdRestore() *cobra.Command {
 	cmd.Flags().StringVar(&opt.outputDir, "output-dir", opt.outputDir, "Directory where output.json file will be written (keep empty if you don't need to write output in file)")
 
 	// vault related flags
+	// -force implies that snapshot will be restore forcefully, required when restoring on a different vault server
 	cmd.Flags().BoolVar(&opt.force, "force", opt.force, "Specify whether to force restore or not")
 
 	return cmd
@@ -170,52 +174,62 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
+	// get the vault appbinding which has necessary information about vault & vault backup token
 	appBinding, err := opt.catalogClient.AppcatalogV1alpha1().AppBindings(opt.appBindingNamespace).Get(context.TODO(), opt.appBindingName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
+	//  get the vault server to extract necessary information about unseal mode for the unseal keys & root token
 	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
+	// update this while adding support for more backend options for backup (consul, s3, etc.)
 	if vs.Spec.Backend.Raft == nil {
 		return nil, errors.New("Backend must be Raft for restoring snapshots")
 	}
 
+	// clean the interim directory where the snapshot, unseal keys & root token will be stored
 	if err = clearDir(opt.interimDataDir); err != nil {
 		return nil, err
 	}
 
 	session := opt.newSessionWrapper(VaultCMD)
 
+	// create a new vault client to interact with vault
+	// this is needed for running commands like: vault operator raft snapshot save backup.snap or restore backup.snap
 	vaultClient, err := newVaultClient(appBinding)
 	if err != nil {
 		return nil, err
 	}
 
+	// if the vault is TLS enabled then set the env variable for vault TLS
 	err = session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir)
 	if err != nil {
 		return nil, err
 	}
 
-	err = session.waitForVaultReady(vaultClient, opt.waitTimeout, appBinding)
+	// wait until the vault is ready (vault must be unsealed when ready)
+	err = session.waitForVaultReady(vaultClient, opt.waitTimeout)
 	if err != nil {
 		return nil, err
 	}
 
+	// set the vault token that has the necessary permission to save or restore snapshot
 	err = session.setVaultToken(opt.kubeClient, appBinding, vs)
 	if err != nil {
 		return nil, err
 	}
 
+	// set the vault connection parameters, essentially the vault leader node address
 	err = session.setVaultConnectionParameters(vaultClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.Infof("Try to restore for VaultServer %s/%s\n", vs.Namespace, vs.Name)
+	klog.Infof("Trying to restore snapshot for VaultServer %s/%s\n", vs.Namespace, vs.Name)
 
 	opt.restoreOptions.RestorePaths = []string{opt.interimDataDir}
 
@@ -229,13 +243,17 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
+	// restore the vault snapshot from the interim directory running command like: vault operator raft snapshot restore backup.snap
+	// for different vault server using -force flag like: vault operator raft snapshot restore -force backup.snap
 	err = opt.restoreVaultSnapshot(session)
 	if err != nil {
 		return nil, err
 	}
 
+	// if -force is true, we're potentially dealing with restoring snapshot on a different vault server
+	// we must replace the current vault server's unseal keys & root token with the older ones that we saved during snapshot
 	if opt.force {
-		klog.Infoln("Potentially different VaultServer. Apply -force to restore snapshot.")
+		klog.Infoln("Potentially different VaultServer. Trying to migrate old unseal keys & root token.")
 		if err := opt.setVaultTokenKeys(vs); err != nil {
 			return nil, err
 		}
@@ -246,16 +264,18 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 }
 
 func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
+	klog.Infoln("Trying to restore snapshot")
 	session.cmd.Args = append(session.cmd.Args, "operator", "raft", "snapshot", "restore")
 
 	// -force is required for different vault cluster snapshot restoration
 	if opt.force {
+		klog.Infoln("Potentially different VaultServer. Applying -force to restore snapshot")
 		session.cmd.Args = append(session.cmd.Args, "-force")
 	}
 
 	session.cmd.Args = append(session.cmd.Args, filepath.Join(opt.interimDataDir, VaultSnapshotFile))
 
-	session.sh.ShowCMD = true
+	session.sh.ShowCMD = false
 	session.setUserArgs(opt.vaultArgs)
 	session.sh.Command(VaultCMD, session.cmd.Args...)
 
@@ -268,12 +288,17 @@ func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 }
 
 func (opt *VaultOptions) setVaultTokenKeys(vs *vaultapi.VaultServer) error {
+	klog.Infoln("Trying to read, set unseal keys & root token")
 	keyPrefix, err := opt.getKeyPrefix()
 	if err != nil {
 		return err
 	}
 	opt.keyPrefix = keyPrefix
 
+	// create a new store interface
+	// for restore:
+	// i. read the unseal keys & root token from the interim directory
+	// ii. Set the unseal keys & root token to store based on the unseal mode
 	st, err := store.NewStore(opt.kubeClient, vs)
 	if err != nil {
 		return err

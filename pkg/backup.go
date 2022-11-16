@@ -76,14 +76,18 @@ func NewCmdBackup() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
 			opt.stashClient, err = stash.NewForConfig(config)
 			if err != nil {
 				return err
 			}
+
 			opt.catalogClient, err = appcatalog_cs.NewForConfig(config)
 			if err != nil {
 				return err
 			}
+
+			// create the client for vaultserver
 			opt.extClient, err = cs.NewForConfig(config)
 			if err != nil {
 				return err
@@ -199,62 +203,76 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
+	// get the vault appbinding which has necessary information about vault & vault backup token
 	appBinding, err := opt.catalogClient.AppcatalogV1alpha1().AppBindings(opt.appBindingNamespace).Get(context.TODO(), opt.appBindingName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
+	// get the vault server to extract necessary information about unseal mode for the unseal keys & root token
 	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
+	// update this while adding support for more backend options for backup (consul, s3, etc.)
 	if vs.Spec.Backend.Raft == nil {
 		return nil, errors.New("Backend must be Raft for backup snapshots")
 	}
 
+	// clean the interim directory where the snapshot, unseal keys & root token will be stored
 	if err = clearDir(opt.interimDataDir); err != nil {
 		return nil, err
 	}
 
 	session := opt.newSessionWrapper(VaultCMD)
 
+	// create a new vault client to interact with vault
+	// this is needed for running commands like: vault operator raft snapshot save backup.snap or restore backup.snap
 	vaultClient, err := newVaultClient(appBinding)
 	if err != nil {
 		return nil, err
 	}
 
+	// if the vault is TLS enabled then set the env variable for vault TLS
 	err = session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir)
 	if err != nil {
 		return nil, err
 	}
 
-	err = session.waitForVaultReady(vaultClient, opt.waitTimeout, appBinding)
+	// wait until the vault is ready (vault must be unsealed when ready)
+	err = session.waitForVaultReady(vaultClient, opt.waitTimeout)
 	if err != nil {
 		return nil, err
 	}
 
+	// set the vault token that has the necessary permission to save or restore snapshot
 	err = session.setVaultToken(opt.kubeClient, appBinding, vs)
 	if err != nil {
 		return nil, err
 	}
 
+	// set the vault connection parameters, essentially the vault leader node address
 	err = session.setVaultConnectionParameters(vaultClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.Infof("Try to backup for VaultServer %s/%s\n", vs.Namespace, vs.Name)
+	klog.Infof("Trying to backup for VaultServer %s/%s\n", vs.Namespace, vs.Name)
 
+	// save the vault snapshot in the interim directory running command like: vault operator raft snapshot save backup.snap
 	err = opt.saveVaultSnapshot(session)
 	if err != nil {
 		return nil, err
 	}
 
+	// save the unseal keys & root token too, for complete backup
+	// write these in the interim directory along with the snapshot file
 	if err := opt.writeVaultTokenKeys(vs); err != nil {
 		return nil, err
 	}
 
+	// now take the backup of this directory using stash/restic
 	opt.backupOptions.BackupPaths = []string{opt.interimDataDir}
 	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
 	if err != nil {
@@ -265,9 +283,10 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 }
 
 func (opt *VaultOptions) saveVaultSnapshot(session *sessionWrapper) error {
+	klog.Infoln("Trying to save snapshot")
 	session.cmd.Args = append(session.cmd.Args, "operator", "raft", "snapshot", "save", filepath.Join(opt.interimDataDir, VaultSnapshotFile))
 
-	session.sh.ShowCMD = true
+	session.sh.ShowCMD = false
 	session.setUserArgs(opt.vaultArgs)
 	session.sh.Command(VaultCMD, session.cmd.Args...)
 
@@ -280,12 +299,17 @@ func (opt *VaultOptions) saveVaultSnapshot(session *sessionWrapper) error {
 }
 
 func (opt *VaultOptions) writeVaultTokenKeys(vs *vaultapi.VaultServer) error {
+	klog.Infoln("Trying to get, write unseal keys & root token")
 	keyPrefix, err := opt.getKeyPrefix()
 	if err != nil {
 		return err
 	}
 	opt.keyPrefix = keyPrefix
 
+	// create a new store interface
+	// for backup:
+	// i. Get the unseal key & root token from store based on the unseal mode
+	// ii. write them into the interim directory which will be backed up
 	st, err := store.NewStore(opt.kubeClient, vs)
 	if err != nil {
 		return err
