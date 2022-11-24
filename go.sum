@@ -774,8 +774,8 @@ kmodules.xyz/offshoot-api v0.25.0 h1:Svq9da/+sg5afOjpgo9vx2J/Lu90Mo0aFxkdQmgKnGI
 kmodules.xyz/offshoot-api v0.25.0/go.mod h1:ysEBn7LJuT3+s8ynAQA/OG0BSsJugXa6KGtDLMRjlKo=
 kmodules.xyz/prober v0.25.0 h1:R5uRLHJEvEtEoogj+vaTAob0Btph6+PX5IlS6hPh8PA=
 kmodules.xyz/prober v0.25.0/go.mod h1:z4RTnjaajNQa/vPltsiOnO3xI716I/ziD2ac2Exm+1M=
-kubevault.dev/apimachinery v0.10.1-0.20221109085140-f0a4ffd7f63e h1:+CSlvZxIK54J+8YAw6p1ATvTE5LgTGfdKvxL8V8I3t4=
-kubevault.dev/apimachinery v0.10.1-0.20221109085140-f0a4ffd7f63e/go.mod h1:fUzeVdoB8pVr0qlDJMvGEDZfuio65ktuXpByafdPCqs=
+kubevault.dev/apimachinery v0.10.1-0.20221124110716-fdb9195dd8aa h1:Q1xkodIZ3hkmDjSoaHasGwmusPucG9nHXL41DUvwZlo=
+kubevault.dev/apimachinery v0.10.1-0.20221124110716-fdb9195dd8aa/go.mod h1:fUzeVdoB8pVr0qlDJMvGEDZfuio65ktuXpByafdPCqs=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 sigs.k8s.io/controller-runtime v0.13.0 h1:iqa5RNciy7ADWnIc8QxCbOX5FEKVR3uxVxKHRMc2WIQ=
 sigs.k8s.io/controller-runtime v0.13.0/go.mod h1:Zbz+el8Yg31jubvAEyglRZGdLAjplZl+PgtYNI6WNTI=
