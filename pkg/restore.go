@@ -192,7 +192,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 	}
 
 	// clean the interim directory where the snapshot, unseal keys & root token will be stored
-	if err = clearDir(opt.interimDataDir); err != nil {
+	if err := clearDir(opt.interimDataDir); err != nil {
 		return nil, err
 	}
 
@@ -206,26 +206,22 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 	}
 
 	// if the vault is TLS enabled then set the env variable for vault TLS
-	err = session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir)
-	if err != nil {
+	if err := session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir); err != nil {
 		return nil, err
 	}
 
 	// wait until the vault is ready (vault must be unsealed when ready)
-	err = session.waitForVaultReady(vaultClient, opt.waitTimeout)
-	if err != nil {
+	if err := session.waitForVaultReady(vaultClient, opt.waitTimeout); err != nil {
 		return nil, err
 	}
 
 	// set the vault token that has the necessary permission to save or restore snapshot
-	err = session.setVaultToken(opt.kubeClient, appBinding, vs)
-	if err != nil {
+	if err := session.setVaultToken(opt.kubeClient, appBinding, vs); err != nil {
 		return nil, err
 	}
 
 	// set the vault connection parameters, essentially the vault leader node address
-	err = session.setVaultConnectionParameters(vaultClient, appBinding)
-	if err != nil {
+	if err := session.setVaultConnectionParameters(vaultClient, appBinding); err != nil {
 		return nil, err
 	}
 
@@ -245,8 +241,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 
 	// restore the vault snapshot from the interim directory running command like: vault operator raft snapshot restore backup.snap
 	// for different vault server using -force flag like: vault operator raft snapshot restore -force backup.snap
-	err = opt.restoreVaultSnapshot(session)
-	if err != nil {
+	if err := opt.restoreVaultSnapshot(session); err != nil {
 		return nil, err
 	}
 
@@ -319,6 +314,7 @@ func (opt *VaultOptions) setVaultTokenKeys(vs *vaultapi.VaultServer) error {
 
 		if err := st.Set(key, value); err != nil {
 			klog.Errorf("failed to set key %s with %s\n", key, err.Error())
+			return err
 		}
 	}
 

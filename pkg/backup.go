@@ -182,14 +182,12 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		Namespace:         opt.namespace,
 	}
 
-	err = api_util.ExecutePreBackupActions(actionOptions)
-	if err != nil {
+	if err := api_util.ExecutePreBackupActions(actionOptions); err != nil {
 		return nil, err
 	}
 
 	// wait until the backend repository has been initialized.
-	err = api_util.WaitForBackendRepository(actionOptions)
-	if err != nil {
+	if err := api_util.WaitForBackendRepository(actionOptions); err != nil {
 		return nil, err
 	}
 
@@ -235,34 +233,29 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 	}
 
 	// if the vault is TLS enabled then set the env variable for vault TLS
-	err = session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir)
-	if err != nil {
+	if err := session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir); err != nil {
 		return nil, err
 	}
 
 	// wait until the vault is ready (vault must be unsealed when ready)
-	err = session.waitForVaultReady(vaultClient, opt.waitTimeout)
-	if err != nil {
+	if err := session.waitForVaultReady(vaultClient, opt.waitTimeout); err != nil {
 		return nil, err
 	}
 
 	// set the vault token that has the necessary permission to save or restore snapshot
-	err = session.setVaultToken(opt.kubeClient, appBinding, vs)
-	if err != nil {
+	if err := session.setVaultToken(opt.kubeClient, appBinding, vs); err != nil {
 		return nil, err
 	}
 
 	// set the vault connection parameters, essentially the vault leader node address
-	err = session.setVaultConnectionParameters(vaultClient, appBinding)
-	if err != nil {
+	if err := session.setVaultConnectionParameters(vaultClient, appBinding); err != nil {
 		return nil, err
 	}
 
 	klog.Infof("Trying to backup for VaultServer %s/%s\n", vs.Namespace, vs.Name)
 
 	// save the vault snapshot in the interim directory running command like: vault operator raft snapshot save backup.snap
-	err = opt.saveVaultSnapshot(session)
-	if err != nil {
+	if err := opt.saveVaultSnapshot(session); err != nil {
 		return nil, err
 	}
 
@@ -330,6 +323,7 @@ func (opt *VaultOptions) writeVaultTokenKeys(vs *vaultapi.VaultServer) error {
 
 		if err := opt.write(key, value); err != nil {
 			klog.Errorf("failed to write key %s with %s\n", key, err.Error())
+			return err
 		}
 	}
 
@@ -343,8 +337,5 @@ func (opt *VaultOptions) write(key, value string) error {
 		return err
 	}
 
-	if err = os.WriteFile(filepath.Join(opt.interimDataDir, key), byteStreams, 0o644); err != nil {
-		return err
-	}
-	return nil
+	return os.WriteFile(filepath.Join(opt.interimDataDir, key), byteStreams, 0o644)
 }

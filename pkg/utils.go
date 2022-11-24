@@ -105,8 +105,7 @@ func (session *sessionWrapper) setVaultToken(kubeClient kubernetes.Interface, ap
 		return err
 	}
 
-	err = appBinding.TransformSecret(kubeClient, tokenSecret.Data)
-	if err != nil {
+	if err := appBinding.TransformSecret(kubeClient, tokenSecret.Data); err != nil {
 		return err
 	}
 
@@ -211,7 +210,7 @@ func getLeaderAddress(vc *api.Client, appBinding *appcatalog.AppBinding) (string
 
 	addr := resp.LeaderClusterAddress
 	if len(addr) == 0 {
-		return "", errors.New("addr is empty")
+		return "", errors.New("leader address is empty")
 	}
 
 	addr = addr[strings.LastIndex(addr, "/")+1 : strings.LastIndex(addr, ":")]
