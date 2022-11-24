@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appcat "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 )
 
 const (
@@ -57,6 +58,10 @@ type VaultServerConfiguration struct {
 	// Specifies the Secret name that contains the token with permission for backup/restore
 	// +optional
 	VaultBackupToken *core.LocalObjectReference `json:"vaultBackupToken,omitempty"`
+
+	// Stash defines backup and restore task definitions.
+	// +optional
+	Stash appcat.StashAddonSpec `json:"stash,omitempty"`
 }
 
 // KubernetesAuthConfiguration contains necessary information for

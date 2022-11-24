@@ -98,6 +98,7 @@ func (in *VaultServerConfiguration) DeepCopyInto(out *VaultServerConfiguration) 
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
+	in.Stash.DeepCopyInto(&out.Stash)
 	return
 }
 
