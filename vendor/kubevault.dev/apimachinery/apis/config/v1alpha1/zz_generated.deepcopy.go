@@ -93,8 +93,8 @@ func (in *VaultServerConfiguration) DeepCopyInto(out *VaultServerConfiguration) 
 		*out = new(AWSAuthConfig)
 		**out = **in
 	}
-	if in.VaultBackupToken != nil {
-		in, out := &in.VaultBackupToken, &out.VaultBackupToken
+	if in.BackupTokenSecretRef != nil {
+		in, out := &in.BackupTokenSecretRef, &out.BackupTokenSecretRef
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}

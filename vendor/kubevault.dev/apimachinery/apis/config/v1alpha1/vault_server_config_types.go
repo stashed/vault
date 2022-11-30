@@ -57,7 +57,7 @@ type VaultServerConfiguration struct {
 
 	// Specifies the Secret name that contains the token with permission for backup/restore
 	// +optional
-	VaultBackupToken *core.LocalObjectReference `json:"vaultBackupToken,omitempty"`
+	BackupTokenSecretRef *core.LocalObjectReference `json:"backupTokenSecretRef,omitempty"`
 
 	// Stash defines backup and restore task definitions.
 	// +optional
