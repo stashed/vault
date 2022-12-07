@@ -36,6 +36,7 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
@@ -45,13 +46,18 @@ const (
 )
 
 type GcsStore struct {
-	vs     *vaultapi.VaultServer
-	client *storage.Client
+	gcsSpec    *vaultapi.GoogleKmsGcsSpec
+	client     *storage.Client
+	appBinding *appcatalog.AppBinding
 }
 
-func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*GcsStore, error) {
-	if vs == nil {
-		return nil, errors.New("vault server is nil")
+func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, gcsSpec *vaultapi.GoogleKmsGcsSpec) (*GcsStore, error) {
+	if appBinding == nil {
+		return nil, errors.New("appBinding is nil")
+	}
+
+	if gcsSpec == nil {
+		return nil, errors.New("gcsSpec is nil")
 	}
 
 	if kc == nil {
@@ -59,11 +65,11 @@ func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*GcsStore, error) {
 	}
 
 	var cred string
-	if vs.Spec.Unsealer.Mode.GoogleKmsGcs.CredentialSecretRef != nil {
-		cred = vs.Spec.Unsealer.Mode.GoogleKmsGcs.CredentialSecretRef.Name
+	if gcsSpec.CredentialSecretRef != nil {
+		cred = gcsSpec.CredentialSecretRef.Name
 	}
 
-	secret, err := kc.CoreV1().Secrets(vs.Namespace).Get(context.TODO(), cred, metav1.GetOptions{})
+	secret, err := kc.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -92,14 +98,14 @@ func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*GcsStore, error) {
 	}
 
 	return &GcsStore{
-		vs:     vs,
-		client: client,
+		gcsSpec:    gcsSpec,
+		client:     client,
+		appBinding: appBinding,
 	}, nil
 }
 
 func (store *GcsStore) Get(key string) (string, error) {
-	googleKmsGcsSpec := store.vs.Spec.Unsealer.Mode.GoogleKmsGcs
-	rc, err := store.client.Bucket(googleKmsGcsSpec.Bucket).Object(key).NewReader(context.TODO())
+	rc, err := store.client.Bucket(store.gcsSpec.Bucket).Object(key).NewReader(context.TODO())
 	if err != nil {
 		return "", err
 	}
@@ -111,8 +117,8 @@ func (store *GcsStore) Get(key string) (string, error) {
 	}
 
 	name := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
-		googleKmsGcsSpec.KmsProject, googleKmsGcsSpec.KmsLocation,
-		googleKmsGcsSpec.KmsKeyRing, googleKmsGcsSpec.KmsCryptoKey)
+		store.gcsSpec.KmsProject, store.gcsSpec.KmsLocation,
+		store.gcsSpec.KmsKeyRing, store.gcsSpec.KmsCryptoKey)
 
 	decryptedToken, err := decryptSymmetric(name, body)
 	if err != nil {
@@ -128,11 +134,9 @@ func (store *GcsStore) Set(key, value string) error {
 		return errors.Errorf("error creating google kms service client: %s", err.Error())
 	}
 
-	googleKmsGcsSpec := store.vs.Spec.Unsealer.Mode.GoogleKmsGcs
-
 	name := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
-		googleKmsGcsSpec.KmsProject, googleKmsGcsSpec.KmsLocation,
-		googleKmsGcsSpec.KmsKeyRing, googleKmsGcsSpec.KmsCryptoKey)
+		store.gcsSpec.KmsProject, store.gcsSpec.KmsLocation,
+		store.gcsSpec.KmsKeyRing, store.gcsSpec.KmsCryptoKey)
 
 	resp, err := kmsService.Projects.Locations.KeyRings.CryptoKeys.Encrypt(name, &cloudkms.EncryptRequest{
 		Plaintext: base64.StdEncoding.EncodeToString([]byte(value)),
@@ -146,11 +150,9 @@ func (store *GcsStore) Set(key, value string) error {
 		return err
 	}
 
-	bucket := store.vs.Spec.Unsealer.Mode.GoogleKmsGcs.Bucket
-
-	w := store.client.Bucket(bucket).Object(key).NewWriter(context.TODO())
+	w := store.client.Bucket(store.gcsSpec.Bucket).Object(key).NewWriter(context.TODO())
 	if _, err := w.Write(cipherText); err != nil {
-		return fmt.Errorf("error writing key '%s' to gcs bucket '%s'", key, bucket)
+		return fmt.Errorf("error writing key '%s' to gcs bucket '%s'", key, store.gcsSpec.Bucket)
 	}
 
 	return w.Close()

@@ -634,7 +634,6 @@ golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 h1:H2TDz8ibqkAF6YGhCdN3j
 golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2/go.mod h1:K8+ghG5WaK9qNqU5K3HdILfMLy1f3aNYFI/wnl100a8=
 gomodules.xyz/clock v0.0.0-20200817085942-06523dba733f h1:hTyhR4r+tj1Uq7/PpFxLTzbeA0LhMVp7bEYfhkzFjdY=
 gomodules.xyz/clock v0.0.0-20200817085942-06523dba733f/go.mod h1:K3m7N+nBOlf91/tpv8REUGwsAgaKFwElQCuiLhm12AQ=
-gomodules.xyz/encoding v0.0.7 h1:Y4PaflVS+vkYgkw6FwyF1S0ab4Y1BAdOqB3Uwjcx8qI=
 gomodules.xyz/flags v0.1.3 h1:jQ06+EfmoMv5NvjXvJon03dOhLU+FF0TQMWN7I6qpzs=
 gomodules.xyz/flags v0.1.3/go.mod h1:e+kvBLnqdEWGG670SKOYag1CXStM2Slrxq01OIK3tFs=
 gomodules.xyz/go-sh v0.1.0 h1:1BJAuGREh2RhePt7HRrpmjnkbgfpXlCzc42SiyZ5dkc=
@@ -650,7 +649,6 @@ gomodules.xyz/pointer v0.1.0/go.mod h1:sPLsC0+yLTRecUiC5yVlyvXhZ6LAGojNCRWNNqopl
 gomodules.xyz/sets v0.2.0/go.mod h1:jKgNp01/iDs+svOWXaPk5cKP3VXy0mWUoTF/ore+aMc=
 gomodules.xyz/sets v0.2.1 h1:vK3oUWoGVrZKLDKO/bzEo/ucHFdCE7+DxWPeWxK72KQ=
 gomodules.xyz/sets v0.2.1/go.mod h1:jKgNp01/iDs+svOWXaPk5cKP3VXy0mWUoTF/ore+aMc=
-gomodules.xyz/testing v0.0.4 h1:XGKt4B64mBe7P9kPR0Rz1nCQpWoSpBEFdTGkfU1RLe4=
 gomodules.xyz/wait v0.2.0 h1:HnRIh+cvIrrKIFaXoYznCVVirv2/2xu3KzjSzsQmYAY=
 gomodules.xyz/wait v0.2.0/go.mod h1:g/epKzZQuCqgvhzhaoG4cSBNGHqnOrhFR4Q7szDJ1JM=
 gomodules.xyz/x v0.0.14 h1:eD1+3YjTEt46dhErbuPEr1Vw+7xbFBNx6T26E7nCRwM=
@@ -764,8 +762,8 @@ kmodules.xyz/apiversion v0.2.0 h1:vAQYqZFm4xu4pbB1cAdHbFEPES6EQkcR4wc06xdTOWk=
 kmodules.xyz/apiversion v0.2.0/go.mod h1:oPX8g8LvlPdPX3Yc5YvCzJHQnw3YF/X4/jdW0b1am80=
 kmodules.xyz/client-go v0.25.6 h1:59mMNoanKrqOFYqDMtqYU5caFxd+7YrfNqpvyKYWqNE=
 kmodules.xyz/client-go v0.25.6/go.mod h1:NgLAVr+IEAFpI9g7FhZF5qG0SG+SBADxknWu5jp0m8M=
-kmodules.xyz/custom-resources v0.25.0 h1:5JQTEuiv6lC/+VVFNKqzfX4YtJCmN5E7mcNtGnHGVQM=
-kmodules.xyz/custom-resources v0.25.0/go.mod h1:ULwzvLmOqZJcPSXKI7iLclYL5eYRlKx8Nbex28Ht19E=
+kmodules.xyz/custom-resources v0.25.1 h1:0qHPTxbT/q0afl2GCOnwPFaoxKziRIPXgVu77YwrCa4=
+kmodules.xyz/custom-resources v0.25.1/go.mod h1:ULwzvLmOqZJcPSXKI7iLclYL5eYRlKx8Nbex28Ht19E=
 kmodules.xyz/monitoring-agent-api v0.25.0 h1:RU9RBeCqQdoS381xXy8cM1aqT+7qmtuPI3KxNQoX16Y=
 kmodules.xyz/monitoring-agent-api v0.25.0/go.mod h1:RH5f/W9eCiW+KTblBIh8MZkjCWdtMQ8MuzCBMfgkynM=
 kmodules.xyz/objectstore-api v0.25.0 h1:xT7+SXBqAMtVkfOdp4espHAfZ6MYUC4G1OgzTkURNnU=
@@ -774,8 +772,8 @@ kmodules.xyz/offshoot-api v0.25.0 h1:Svq9da/+sg5afOjpgo9vx2J/Lu90Mo0aFxkdQmgKnGI
 kmodules.xyz/offshoot-api v0.25.0/go.mod h1:ysEBn7LJuT3+s8ynAQA/OG0BSsJugXa6KGtDLMRjlKo=
 kmodules.xyz/prober v0.25.0 h1:R5uRLHJEvEtEoogj+vaTAob0Btph6+PX5IlS6hPh8PA=
 kmodules.xyz/prober v0.25.0/go.mod h1:z4RTnjaajNQa/vPltsiOnO3xI716I/ziD2ac2Exm+1M=
-kubevault.dev/apimachinery v0.11.0 h1:zMHHKkAmyZ3qWxPlAEdgoYaAW5+AGK737NoR0JSQZJU=
-kubevault.dev/apimachinery v0.11.0/go.mod h1:fUzeVdoB8pVr0qlDJMvGEDZfuio65ktuXpByafdPCqs=
+kubevault.dev/apimachinery v0.11.1-0.20221206093440-73646cb9a3e5 h1:VtOW5q3yqqjNXVU2Vmord3rMeocWy1HzRfMugYLKRw0=
+kubevault.dev/apimachinery v0.11.1-0.20221206093440-73646cb9a3e5/go.mod h1:fUzeVdoB8pVr0qlDJMvGEDZfuio65ktuXpByafdPCqs=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 sigs.k8s.io/controller-runtime v0.13.0 h1:iqa5RNciy7ADWnIc8QxCbOX5FEKVR3uxVxKHRMc2WIQ=
 sigs.k8s.io/controller-runtime v0.13.0/go.mod h1:Zbz+el8Yg31jubvAEyglRZGdLAjplZl+PgtYNI6WNTI=

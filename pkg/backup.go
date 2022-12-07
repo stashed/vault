@@ -39,8 +39,7 @@ import (
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
-	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
-	cs "kubevault.dev/apimachinery/client/clientset/versioned"
+	vaultconfig "kubevault.dev/apimachinery/apis/config/v1alpha1"
 )
 
 func NewCmdBackup() *cobra.Command {
@@ -83,12 +82,6 @@ func NewCmdBackup() *cobra.Command {
 			}
 
 			opt.catalogClient, err = appcatalog_cs.NewForConfig(config)
-			if err != nil {
-				return err
-			}
-
-			// create the client for vaultserver
-			opt.extClient, err = cs.NewForConfig(config)
 			if err != nil {
 				return err
 			}
@@ -158,6 +151,7 @@ func NewCmdBackup() *cobra.Command {
 
 	cmd.Flags().StringVar(&opt.outputDir, "output-dir", opt.outputDir, "Directory where output.json file will be written (keep empty if you don't need to write output in file)")
 	cmd.Flags().StringVar(&opt.interimDataDir, "interim-data-dir", opt.interimDataDir, "Directory where the targeted data will be stored temporarily before uploading to the backend")
+	cmd.Flags().StringVar(&opt.keyPrefix, "key-prefix", opt.keyPrefix, "prefix that will be append to root-token & unseal-keys")
 
 	return cmd
 }
@@ -207,14 +201,16 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
-	// get the vault server to extract necessary information about unseal mode for the unseal keys & root token
-	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
+	parameters := vaultconfig.VaultServerConfiguration{}
+	if appBinding.Spec.Parameters != nil {
+		if err = json.Unmarshal(appBinding.Spec.Parameters.Raw, &parameters); err != nil {
+			klog.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw. Reason: %v", err)
+		}
 	}
 
+	opt.keyPrefix = opt.getBackupKeyPrefix(appBinding, parameters)
 	// update this while adding support for more backend options for backup (consul, s3, etc.)
-	if vs.Spec.Backend.Raft == nil {
+	if parameters.Backend != VaultStorageBackendRaft {
 		return nil, errors.New("Backend must be Raft for backup snapshots")
 	}
 
@@ -243,7 +239,7 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 	}
 
 	// set the vault token that has the necessary permission to save or restore snapshot
-	if err := session.setVaultToken(opt.kubeClient, appBinding, vs); err != nil {
+	if err := session.setVaultToken(opt.kubeClient, appBinding, parameters.BackupTokenSecretRef); err != nil {
 		return nil, err
 	}
 
@@ -252,7 +248,7 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
-	klog.Infof("Trying to backup for VaultServer %s/%s\n", vs.Namespace, vs.Name)
+	klog.Infof("Trying to backup for VaultServer %s/%s\n", appBinding.Namespace, appBinding.Name)
 
 	// save the vault snapshot in the interim directory running command like: vault operator raft snapshot save backup.snap
 	if err := opt.saveVaultSnapshot(session); err != nil {
@@ -261,7 +257,7 @@ func (opt *VaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 
 	// save the unseal keys & root token too, for complete backup
 	// write these in the interim directory along with the snapshot file
-	if err := opt.writeVaultTokenKeys(vs); err != nil {
+	if err := opt.writeVaultTokenKeys(appBinding, parameters); err != nil {
 		return nil, err
 	}
 
@@ -291,27 +287,25 @@ func (opt *VaultOptions) saveVaultSnapshot(session *sessionWrapper) error {
 	return nil
 }
 
-func (opt *VaultOptions) writeVaultTokenKeys(vs *vaultapi.VaultServer) error {
-	klog.Infoln("Trying to get, write unseal keys & root token")
-	keyPrefix, err := opt.getKeyPrefix()
-	if err != nil {
-		return err
+func (opt *VaultOptions) writeVaultTokenKeys(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) error {
+	if params.Unsealer == nil {
+		return errors.New("unsealer spec is nil")
 	}
-	opt.keyPrefix = keyPrefix
 
+	klog.Infoln("Trying to get, write unseal keys & root token")
 	// create a new store interface
 	// for backup:
 	// i. Get the unseal key & root token from store based on the unseal mode
 	// ii. write them into the interim directory which will be backed up
-	st, err := store.NewStore(opt.kubeClient, vs)
+	st, err := store.NewStore(opt.kubeClient, appBinding, params.Unsealer)
 	if err != nil {
 		return err
 	}
 
 	var keys []string
-	keys = append(keys, opt.tokenName())
-	for i := 0; i < int(vs.Spec.Unsealer.SecretShares); i++ {
-		keys = append(keys, opt.unsealKeyName(i))
+	keys = append(keys, opt.tokenName(opt.keyPrefix))
+	for i := 0; i < int(params.Unsealer.SecretShares); i++ {
+		keys = append(keys, opt.unsealKeyName(opt.keyPrefix, i))
 	}
 
 	for _, key := range keys {

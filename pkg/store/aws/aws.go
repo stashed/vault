@@ -28,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
@@ -39,12 +40,17 @@ const (
 type AwsKmsStore struct {
 	ssmService *ssm.SSM
 	kmsService *kms.KMS
-	vs         *vaultapi.VaultServer
+	awsSpec    *vaultapi.AwsKmsSsmSpec
+	appBinding *appcatalog.AppBinding
 }
 
-func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*AwsKmsStore, error) {
-	if vs == nil {
-		return nil, errors.New("vault server is nil")
+func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, awsSpec *vaultapi.AwsKmsSsmSpec) (*AwsKmsStore, error) {
+	if appBinding == nil {
+		return nil, errors.New("appBinding is nil")
+	}
+
+	if awsSpec == nil {
+		return nil, errors.New("aws is nil")
 	}
 
 	if kc == nil {
@@ -52,11 +58,11 @@ func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*AwsKmsStore, error
 	}
 
 	var cred string
-	if vs.Spec.Unsealer.Mode.AwsKmsSsm.CredentialSecretRef != nil {
-		cred = vs.Spec.Unsealer.Mode.AwsKmsSsm.CredentialSecretRef.Name
+	if awsSpec.CredentialSecretRef != nil {
+		cred = awsSpec.CredentialSecretRef.Name
 	}
 
-	secret, err := kc.CoreV1().Secrets(vs.Namespace).Get(context.TODO(), cred, metav1.GetOptions{})
+	secret, err := kc.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +86,7 @@ func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*AwsKmsStore, error
 			f := true
 			return &f
 		}(),
-		Region: aws.String(vs.Spec.Unsealer.Mode.AwsKmsSsm.Region),
+		Region: aws.String(awsSpec.Region),
 	},
 	)
 	if err != nil {
@@ -90,7 +96,8 @@ func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*AwsKmsStore, error
 	return &AwsKmsStore{
 		kmsService: kms.New(sess),
 		ssmService: ssm.New(sess),
-		vs:         vs,
+		awsSpec:    awsSpec,
+		appBinding: appBinding,
 	}, nil
 }
 
@@ -116,14 +123,13 @@ func (store *AwsKmsStore) Get(key string) (string, error) {
 		return "", errors.Wrap(err, "failed to base64-decode")
 	}
 
-	awsKmsSsmSpec := store.vs.Spec.Unsealer.Mode.AwsKmsSsm
 	decryptOutput, err := store.kmsService.Decrypt(&kms.DecryptInput{
 		CiphertextBlob: sDec,
 		EncryptionContext: map[string]*string{
 			"Tool": aws.String("vault-unsealer"),
 		},
 		GrantTokens: []*string{},
-		KeyId:       aws.String(awsKmsSsmSpec.KmsKeyID),
+		KeyId:       aws.String(store.awsSpec.KmsKeyID),
 	})
 	if err != nil {
 		return "", errors.Wrap(err, "failed to kms decrypt")
@@ -133,10 +139,8 @@ func (store *AwsKmsStore) Get(key string) (string, error) {
 }
 
 func (store *AwsKmsStore) Set(key, value string) error {
-	awsKmsSsmSpec := store.vs.Spec.Unsealer.Mode.AwsKmsSsm
-
 	out, err := store.kmsService.Encrypt(&kms.EncryptInput{
-		KeyId:     aws.String(awsKmsSsmSpec.KmsKeyID),
+		KeyId:     aws.String(store.awsSpec.KmsKeyID),
 		Plaintext: []byte(value),
 		EncryptionContext: map[string]*string{
 			"Tool": aws.String("vault-unsealer"),

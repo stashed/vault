@@ -23,17 +23,19 @@ import (
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
 type K8sStore struct {
-	kc kubernetes.Interface
-	vs *vaultapi.VaultServer
+	k8sSpec    *vaultapi.KubernetesSecretSpec
+	kc         kubernetes.Interface
+	appBinding *appcatalog.AppBinding
 }
 
-func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*K8sStore, error) {
-	if vs == nil {
-		return nil, errors.New("vault server is nil")
+func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, k8sSpec *vaultapi.KubernetesSecretSpec) (*K8sStore, error) {
+	if k8sSpec == nil {
+		return nil, errors.New("k8sSpec  is nil")
 	}
 
 	if kc == nil {
@@ -41,38 +43,30 @@ func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*K8sStore, error) {
 	}
 
 	return &K8sStore{
-		vs: vs,
-		kc: kc,
+		k8sSpec:    k8sSpec,
+		kc:         kc,
+		appBinding: appBinding,
 	}, nil
 }
 
 func (store *K8sStore) Get(key string) (string, error) {
-	var name string
-	if store.vs.Spec.Unsealer.Mode.KubernetesSecret != nil {
-		name = store.vs.Spec.Unsealer.Mode.KubernetesSecret.SecretName
-	}
-	ns := store.vs.Namespace
+	name := store.k8sSpec.SecretName
 
-	secret, err := store.kc.CoreV1().Secrets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+	secret, err := store.kc.CoreV1().Secrets(store.appBinding.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
 	if _, ok := secret.Data[key]; !ok {
-		return "", errors.Errorf("%s not found in secret %s/%s", key, ns, name)
+		return "", errors.Errorf("%s not found in secret %s/%s", key, store.appBinding.Namespace, name)
 	}
 
 	return string(secret.Data[key]), nil
 }
 
 func (store *K8sStore) Set(key, value string) error {
-	var name string
-	if store.vs.Spec.Unsealer.Mode.KubernetesSecret != nil {
-		name = store.vs.Spec.Unsealer.Mode.KubernetesSecret.SecretName
-	}
-	ns := store.vs.Namespace
-
-	secret, err := store.kc.CoreV1().Secrets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+	name := store.k8sSpec.SecretName
+	secret, err := store.kc.CoreV1().Secrets(store.appBinding.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		if errors2.IsNotFound(err) {
 			return nil
@@ -82,6 +76,6 @@ func (store *K8sStore) Set(key, value string) error {
 
 	secret.Data[key] = []byte(value)
 
-	_, err = store.kc.CoreV1().Secrets(ns).Update(context.TODO(), secret, metav1.UpdateOptions{})
+	_, err = store.kc.CoreV1().Secrets(store.appBinding.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
 	return err
 }

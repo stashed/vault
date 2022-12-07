@@ -24,9 +24,9 @@ require (
 	k8s.io/client-go v0.25.1
 	k8s.io/klog/v2 v2.80.1
 	kmodules.xyz/client-go v0.25.6
-	kmodules.xyz/custom-resources v0.25.0
+	kmodules.xyz/custom-resources v0.25.1
 	kmodules.xyz/offshoot-api v0.25.0
-	kubevault.dev/apimachinery v0.11.0
+	kubevault.dev/apimachinery v0.11.1-0.20221206093440-73646cb9a3e5
 	stash.appscode.dev/apimachinery v0.23.0
 )
 

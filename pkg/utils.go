@@ -39,8 +39,8 @@ import (
 	kmapi "kmodules.xyz/client-go/api/v1"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
-	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
-	cs "kubevault.dev/apimachinery/client/clientset/versioned"
+	vaultconfig "kubevault.dev/apimachinery/apis/config/v1alpha1"
+	"kubevault.dev/apimachinery/apis/kubevault"
 )
 
 const (
@@ -58,7 +58,6 @@ type VaultOptions struct {
 	kubeClient    kubernetes.Interface
 	stashClient   stash.Interface
 	catalogClient appcatalog_cs.Interface
-	extClient     cs.Interface
 
 	namespace           string
 	backupSessionName   string
@@ -77,9 +76,15 @@ type VaultOptions struct {
 	interimDataDir string
 
 	// vault related flags
-	force     bool
-	keyPrefix string
+	force bool
+
+	keyPrefix    string
+	oldKeyPrefix string
 }
+
+const (
+	VaultStorageBackendRaft = "raft"
+)
 
 type BackupToken struct {
 	VaultBackupToken *core.LocalObjectReference `json:"vaultBackupToken,omitempty"`
@@ -99,8 +104,13 @@ func (opt *VaultOptions) newSessionWrapper(cmd string) *sessionWrapper {
 	}
 }
 
-func (session *sessionWrapper) setVaultToken(kubeClient kubernetes.Interface, appBinding *appcatalog.AppBinding, vs *vaultapi.VaultServer) error {
-	tokenSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), vs.BackupSecretName(), metav1.GetOptions{})
+func (session *sessionWrapper) setVaultToken(kubeClient kubernetes.Interface, appBinding *appcatalog.AppBinding, backupTokenRef *core.LocalObjectReference) error {
+	var secretName string
+	if backupTokenRef != nil {
+		secretName = backupTokenRef.Name
+	}
+
+	tokenSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -220,31 +230,57 @@ func getLeaderAddress(vc *api.Client, appBinding *appcatalog.AppBinding) (string
 	return leaderAddr, nil
 }
 
-func (opt *VaultOptions) getKeyPrefix() (string, error) {
-	sts, err := opt.kubeClient.AppsV1().StatefulSets(opt.appBindingNamespace).Get(context.TODO(), opt.appBindingName, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	var keyPrefix string
-	for _, cont := range sts.Spec.Template.Spec.Containers {
-		if cont.Name != vaultapi.VaultUnsealerContainerName {
-			continue
-		}
-		for _, arg := range cont.Args {
-			if strings.HasPrefix(arg, "--key-prefix=") {
-				keyPrefix = arg[1+strings.Index(arg, "="):]
+func (opt *VaultOptions) getBackupKeyPrefix(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) string {
+	// if the app is managed by kubevault, use the default key-prefix: k8s.{kubevault.com or cluster UID}.{vault-namespace}.{vault-name}
+	if appBinding.Spec.AppRef != nil && appBinding.Spec.AppRef.APIGroup == kubevault.GroupName {
+		for _, param := range params.Stash.Addon.BackupTask.Params {
+			if param.Name == "keyPrefix" {
+				return param.Value
 			}
 		}
 	}
 
-	return keyPrefix, nil
+	return ""
 }
 
-func (opt *VaultOptions) unsealKeyName(id int) string {
-	return fmt.Sprintf("%s-unseal-key-%d", opt.keyPrefix, id)
+func (opt *VaultOptions) getRestoreKeyPrefix(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) string {
+	// if the app is managed by kubevault, use the default key-prefix: k8s.{kubevault.com or cluster UID}.{vault-namespace}.{vault-name}
+	if appBinding.Spec.AppRef != nil && appBinding.Spec.AppRef.APIGroup == kubevault.GroupName {
+		for _, param := range params.Stash.Addon.RestoreTask.Params {
+			if param.Name == "keyPrefix" {
+				return param.Value
+			}
+		}
+	}
+
+	return ""
 }
 
-func (opt *VaultOptions) tokenName() string {
-	return fmt.Sprintf("%s-root-token", opt.keyPrefix)
+func (opt *VaultOptions) getRestoreOldKeyPrefix(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) string {
+	// if the app is managed by kubevault, use the default key-prefix: k8s.{kubevault.com or cluster UID}.{vault-namespace}.{vault-name}
+	if appBinding.Spec.AppRef != nil && appBinding.Spec.AppRef.APIGroup == kubevault.GroupName {
+		for _, param := range params.Stash.Addon.RestoreTask.Params {
+			if param.Name == "oldKeyPrefix" {
+				return param.Value
+			}
+		}
+	}
+
+	return ""
+}
+
+func (opt *VaultOptions) unsealKeyName(keyPrefix string, id int) string {
+	if len(keyPrefix) == 0 {
+		return fmt.Sprintf("unseal-key-%d", id)
+	}
+
+	return fmt.Sprintf("%s-unseal-key-%d", keyPrefix, id)
+}
+
+func (opt *VaultOptions) tokenName(keyPrefix string) string {
+	if len(keyPrefix) == 0 {
+		return "root-token"
+	}
+
+	return fmt.Sprintf("%s-root-token", keyPrefix)
 }

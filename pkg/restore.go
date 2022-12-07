@@ -34,8 +34,7 @@ import (
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
-	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
-	cs "kubevault.dev/apimachinery/client/clientset/versioned"
+	vaultconfig "kubevault.dev/apimachinery/apis/config/v1alpha1"
 )
 
 func NewCmdRestore() *cobra.Command {
@@ -75,12 +74,6 @@ func NewCmdRestore() *cobra.Command {
 			}
 
 			opt.catalogClient, err = appcatalog_cs.NewForConfig(config)
-			if err != nil {
-				return err
-			}
-
-			// create the client for vaultserver
-			opt.extClient, err = cs.NewForConfig(config)
 			if err != nil {
 				return err
 			}
@@ -148,6 +141,9 @@ func NewCmdRestore() *cobra.Command {
 	// -force implies that snapshot will be restore forcefully, required when restoring on a different vault server
 	cmd.Flags().BoolVar(&opt.force, "force", opt.force, "Specify whether to force restore or not")
 
+	cmd.Flags().StringVar(&opt.keyPrefix, "key-prefix", opt.keyPrefix, "prefix that will be append to root-token & unseal-keys")
+	cmd.Flags().StringVar(&opt.oldKeyPrefix, "old-key-prefix", opt.oldKeyPrefix, "old prefix that was appended to root-token & unseal-keys")
+
 	return cmd
 }
 
@@ -180,15 +176,19 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	//  get the vault server to extract necessary information about unseal mode for the unseal keys & root token
-	vs, err := opt.extClient.KubevaultV1alpha2().VaultServers(appBinding.Namespace).Get(context.TODO(), appBinding.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
+	parameters := vaultconfig.VaultServerConfiguration{}
+	if appBinding.Spec.Parameters != nil {
+		if err = json.Unmarshal(appBinding.Spec.Parameters.Raw, &parameters); err != nil {
+			klog.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw. Reason: %v", err)
+		}
 	}
 
+	opt.keyPrefix = opt.getRestoreKeyPrefix(appBinding, parameters)
+	opt.oldKeyPrefix = opt.getRestoreOldKeyPrefix(appBinding, parameters)
+
 	// update this while adding support for more backend options for backup (consul, s3, etc.)
-	if vs.Spec.Backend.Raft == nil {
-		return nil, errors.New("Backend must be Raft for restoring snapshots")
+	if parameters.Backend != VaultStorageBackendRaft {
+		return nil, errors.New("Backend must be Raft for backup snapshots")
 	}
 
 	// clean the interim directory where the snapshot, unseal keys & root token will be stored
@@ -216,7 +216,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 	}
 
 	// set the vault token that has the necessary permission to save or restore snapshot
-	if err := session.setVaultToken(opt.kubeClient, appBinding, vs); err != nil {
+	if err := session.setVaultToken(opt.kubeClient, appBinding, parameters.BackupTokenSecretRef); err != nil {
 		return nil, err
 	}
 
@@ -225,7 +225,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	klog.Infof("Trying to restore snapshot for VaultServer %s/%s\n", vs.Namespace, vs.Name)
+	klog.Infof("Trying to restore snapshot for VaultServer %s/%s\n", appBinding.Namespace, appBinding.Name)
 
 	opt.restoreOptions.RestorePaths = []string{opt.interimDataDir}
 
@@ -249,7 +249,7 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 	// we must replace the current vault server's unseal keys & root token with the older ones that we saved during snapshot
 	if opt.force {
 		klog.Infoln("Potentially different VaultServer. Trying to migrate old unseal keys & root token.")
-		if err := opt.setVaultTokenKeys(vs); err != nil {
+		if err := opt.setVaultTokenKeys(appBinding, parameters); err != nil {
 			return nil, err
 		}
 		klog.Infoln("Successfully migrated old unseal keys & root token")
@@ -282,38 +282,42 @@ func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 	return nil
 }
 
-func (opt *VaultOptions) setVaultTokenKeys(vs *vaultapi.VaultServer) error {
-	klog.Infoln("Trying to read, set unseal keys & root token")
-	keyPrefix, err := opt.getKeyPrefix()
-	if err != nil {
-		return err
+func (opt *VaultOptions) setVaultTokenKeys(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) error {
+	if params.Unsealer == nil {
+		return errors.New("unsealer spec is nil")
 	}
-	opt.keyPrefix = keyPrefix
 
+	klog.Infoln("Trying to read, set unseal keys & root token")
 	// create a new store interface
 	// for restore:
 	// i. read the unseal keys & root token from the interim directory
 	// ii. Set the unseal keys & root token to store based on the unseal mode
-	st, err := store.NewStore(opt.kubeClient, vs)
+	st, err := store.NewStore(opt.kubeClient, appBinding, params.Unsealer)
 	if err != nil {
 		return err
 	}
 
-	var keys []string
-	keys = append(keys, opt.tokenName())
-	for i := 0; i < int(vs.Spec.Unsealer.SecretShares); i++ {
-		keys = append(keys, opt.unsealKeyName(i))
+	var oldKeys []string
+	oldKeys = append(oldKeys, opt.tokenName(opt.oldKeyPrefix))
+	for i := 0; i < int(params.Unsealer.SecretShares); i++ {
+		oldKeys = append(oldKeys, opt.unsealKeyName(opt.oldKeyPrefix, i))
 	}
 
-	for _, key := range keys {
-		value, err := opt.read(key)
+	var newKeys []string
+	newKeys = append(newKeys, opt.tokenName(opt.keyPrefix))
+	for i := 0; i < int(params.Unsealer.SecretShares); i++ {
+		newKeys = append(newKeys, opt.unsealKeyName(opt.keyPrefix, i))
+	}
+
+	for idx, oldKey := range oldKeys {
+		value, err := opt.read(oldKey)
 		if err != nil {
-			klog.Errorf("failed to read key %s with %s\n", key, err.Error())
+			klog.Errorf("failed to read key %s with %s\n", oldKey, err.Error())
 			return err
 		}
 
-		if err := st.Set(key, value); err != nil {
-			klog.Errorf("failed to set key %s with %s\n", key, err.Error())
+		if err := st.Set(newKeys[idx], value); err != nil {
+			klog.Errorf("failed to set key %s with %s\n", newKeys[idx], err.Error())
 			return err
 		}
 	}

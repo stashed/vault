@@ -28,6 +28,7 @@ import (
 	"gomodules.xyz/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
@@ -38,24 +39,25 @@ const (
 )
 
 type AzureStore struct {
-	cred *azidentity.DefaultAzureCredential
-	vs   *vaultapi.VaultServer
+	azureSpec  *vaultapi.AzureKeyVault
+	cred       *azidentity.DefaultAzureCredential
+	appBinding *appcatalog.AppBinding
 }
 
-func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*AzureStore, error) {
-	if vs == nil {
-		return nil, errors.New("vault server is nil")
+func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, azureSpec *vaultapi.AzureKeyVault) (*AzureStore, error) {
+	if azureSpec == nil {
+		return nil, errors.New("azureSpec is nil")
 	}
 
-	if kc == nil {
-		return nil, errors.New("kubeClient is nil")
+	if appBinding == nil {
+		return nil, errors.New("appBinding is nil")
 	}
 
 	var cred string
-	if vs.Spec.Unsealer.Mode.AzureKeyVault.CredentialSecretRef != nil {
-		cred = vs.Spec.Unsealer.Mode.AzureKeyVault.CredentialSecretRef.Name
+	if azureSpec.CredentialSecretRef != nil {
+		cred = azureSpec.CredentialSecretRef.Name
 	}
-	secret, err := kc.CoreV1().Secrets(vs.Namespace).Get(context.TODO(), cred, metav1.GetOptions{})
+	secret, err := kc.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), cred, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +76,7 @@ func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*AzureStore, error)
 		}
 	}
 
-	if err := os.Setenv(AzureTenantID, vs.Spec.Unsealer.Mode.AzureKeyVault.TenantID); err != nil {
+	if err := os.Setenv(AzureTenantID, azureSpec.TenantID); err != nil {
 		return nil, err
 	}
 
@@ -84,13 +86,14 @@ func New(kc kubernetes.Interface, vs *vaultapi.VaultServer) (*AzureStore, error)
 	}
 
 	return &AzureStore{
-		cred: azcred,
-		vs:   vs,
+		azureSpec:  azureSpec,
+		cred:       azcred,
+		appBinding: appBinding,
 	}, nil
 }
 
 func (store *AzureStore) Get(key string) (string, error) {
-	vaultBaseUrl := store.vs.Spec.Unsealer.Mode.AzureKeyVault.VaultBaseURL
+	vaultBaseUrl := store.azureSpec.VaultBaseURL
 	client := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
 
 	resp, err := client.GetSecret(context.Background(), strings.Replace(key, ".", "-", -1), "", nil)
@@ -109,7 +112,7 @@ func (store *AzureStore) Get(key string) (string, error) {
 func (store *AzureStore) Set(key, value string) error {
 	key = strings.Replace(key, ".", "-", -1)
 
-	vaultBaseUrl := store.vs.Spec.Unsealer.Mode.AzureKeyVault.VaultBaseURL
+	vaultBaseUrl := store.azureSpec.VaultBaseURL
 	client := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
 
 	_, err := client.SetSecret(context.TODO(), key, azsecrets.SetSecretParameters{
