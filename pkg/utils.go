@@ -39,8 +39,6 @@ import (
 	kmapi "kmodules.xyz/client-go/api/v1"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
-	vaultconfig "kubevault.dev/apimachinery/apis/config/v1alpha1"
-	"kubevault.dev/apimachinery/apis/kubevault"
 )
 
 const (
@@ -228,45 +226,6 @@ func getLeaderAddress(vc *api.Client, appBinding *appcatalog.AppBinding) (string
 	leaderAddr := fmt.Sprintf("%s://%s.%s.svc:%d", appBinding.Spec.ClientConfig.Service.Scheme, addr, appBinding.Namespace, port)
 
 	return leaderAddr, nil
-}
-
-func (opt *VaultOptions) getBackupKeyPrefix(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) string {
-	// if the app is managed by kubevault, use the default key-prefix: k8s.{kubevault.com or cluster UID}.{vault-namespace}.{vault-name}
-	if appBinding.Spec.AppRef != nil && appBinding.Spec.AppRef.APIGroup == kubevault.GroupName {
-		for _, param := range params.Stash.Addon.BackupTask.Params {
-			if param.Name == "keyPrefix" {
-				return param.Value
-			}
-		}
-	}
-
-	return ""
-}
-
-func (opt *VaultOptions) getRestoreKeyPrefix(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) string {
-	// if the app is managed by kubevault, use the default key-prefix: k8s.{kubevault.com or cluster UID}.{vault-namespace}.{vault-name}
-	if appBinding.Spec.AppRef != nil && appBinding.Spec.AppRef.APIGroup == kubevault.GroupName {
-		for _, param := range params.Stash.Addon.RestoreTask.Params {
-			if param.Name == "keyPrefix" {
-				return param.Value
-			}
-		}
-	}
-
-	return ""
-}
-
-func (opt *VaultOptions) getRestoreOldKeyPrefix(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) string {
-	// if the app is managed by kubevault, use the default key-prefix: k8s.{kubevault.com or cluster UID}.{vault-namespace}.{vault-name}
-	if appBinding.Spec.AppRef != nil && appBinding.Spec.AppRef.APIGroup == kubevault.GroupName {
-		for _, param := range params.Stash.Addon.RestoreTask.Params {
-			if param.Name == "oldKeyPrefix" {
-				return param.Value
-			}
-		}
-	}
-
-	return ""
 }
 
 func (opt *VaultOptions) unsealKeyName(keyPrefix string, id int) string {

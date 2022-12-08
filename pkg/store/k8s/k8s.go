@@ -20,9 +20,10 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	errors2 "k8s.io/apimachinery/pkg/api/errors"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	core_util "kmodules.xyz/client-go/core/v1"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
@@ -65,17 +66,19 @@ func (store *K8sStore) Get(key string) (string, error) {
 }
 
 func (store *K8sStore) Set(key, value string) error {
-	name := store.k8sSpec.SecretName
-	secret, err := store.kc.CoreV1().Secrets(store.appBinding.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		if errors2.IsNotFound(err) {
-			return nil
-		}
-		return err
+	secretMeta := metav1.ObjectMeta{
+		Name:      store.k8sSpec.SecretName,
+		Namespace: store.appBinding.Namespace,
 	}
 
-	secret.Data[key] = []byte(value)
+	_, _, err := core_util.CreateOrPatchSecret(context.TODO(), store.kc, secretMeta, func(s *corev1.Secret) *corev1.Secret {
+		if s.Data == nil {
+			s.Data = map[string][]byte{}
+		}
 
-	_, err = store.kc.CoreV1().Secrets(store.appBinding.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{})
+		s.Data[key] = []byte(value)
+		return s
+	}, metav1.PatchOptions{})
+
 	return err
 }

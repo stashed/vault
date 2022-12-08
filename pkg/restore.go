@@ -183,9 +183,6 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		}
 	}
 
-	opt.keyPrefix = opt.getRestoreKeyPrefix(appBinding, parameters)
-	opt.oldKeyPrefix = opt.getRestoreOldKeyPrefix(appBinding, parameters)
-
 	// update this while adding support for more backend options for backup (consul, s3, etc.)
 	if parameters.Backend != VaultStorageBackendRaft {
 		return nil, errors.New("Backend must be Raft for backup snapshots")
