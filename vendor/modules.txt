@@ -1073,7 +1073,7 @@ kmodules.xyz/offshoot-api/api/v1
 # kmodules.xyz/prober v0.25.0
 ## explicit; go 1.18
 kmodules.xyz/prober/api/v1
-# kubevault.dev/apimachinery v0.11.1-0.20221206093440-73646cb9a3e5
+# kubevault.dev/apimachinery v0.12.0
 ## explicit; go 1.18
 kubevault.dev/apimachinery/apis
 kubevault.dev/apimachinery/apis/config

@@ -25,7 +25,7 @@ require (
 	kmodules.xyz/client-go v0.25.6
 	kmodules.xyz/custom-resources v0.25.1
 	kmodules.xyz/offshoot-api v0.25.0
-	kubevault.dev/apimachinery v0.11.1-0.20221206093440-73646cb9a3e5
+	kubevault.dev/apimachinery v0.12.0
 	stash.appscode.dev/apimachinery v0.23.0
 )
 
