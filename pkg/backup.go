@@ -18,12 +18,16 @@ package pkg
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
 	"path/filepath"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
 	"stash.appscode.dev/apimachinery/pkg/restic"
 	api_util "stash.appscode.dev/apimachinery/pkg/util"
+	"stash.appscode.dev/vault/pkg/store"
 
 	"github.com/spf13/cobra"
 	license "go.bytebuilders.dev/license-verifier/kubernetes"
@@ -31,13 +35,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
-)
-
-const (
-	VaultTLSRootCA = "ca.crt"
+	vaultconfig "kubevault.dev/apimachinery/apis/config/v1alpha1"
 )
 
 func NewCmdBackup() *cobra.Command {
@@ -45,14 +47,12 @@ func NewCmdBackup() *cobra.Command {
 		masterURL      string
 		kubeconfigPath string
 		opt            = vaultOptions{
-			vaultArgs: "--all-databases",
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
 				EnableCache: false,
 			},
 			backupOptions: restic.BackupOptions{
-				Host:          restic.DefaultHost,
-				StdinFileName: VaultDumpFile,
+				Host: restic.DefaultHost,
 			},
 		}
 	)
@@ -75,14 +75,17 @@ func NewCmdBackup() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
 			opt.stashClient, err = stash.NewForConfig(config)
 			if err != nil {
 				return err
 			}
+
 			opt.catalogClient, err = appcatalog_cs.NewForConfig(config)
 			if err != nil {
 				return err
 			}
+
 			targetRef := api_v1beta1.TargetRef{
 				APIVersion: appcatalog.SchemeGroupVersion.String(),
 				Kind:       appcatalog.ResourceKindApp,
@@ -147,6 +150,8 @@ func NewCmdBackup() *cobra.Command {
 	cmd.Flags().BoolVar(&opt.backupOptions.RetentionPolicy.DryRun, "retention-dry-run", opt.backupOptions.RetentionPolicy.DryRun, "Specify whether to test retention policy without deleting actual data")
 
 	cmd.Flags().StringVar(&opt.outputDir, "output-dir", opt.outputDir, "Directory where output.json file will be written (keep empty if you don't need to write output in file)")
+	cmd.Flags().StringVar(&opt.interimDataDir, "interim-data-dir", opt.interimDataDir, "Directory where the targeted data will be stored temporarily before uploading to the backend")
+	cmd.Flags().StringVar(&opt.keyPrefix, "key-prefix", opt.keyPrefix, "prefix that will be append to root-token & unseal-keys")
 
 	return cmd
 }
@@ -171,14 +176,12 @@ func (opt *vaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		Namespace:         opt.namespace,
 	}
 
-	err = api_util.ExecutePreBackupActions(actionOptions)
-	if err != nil {
+	if err := api_util.ExecutePreBackupActions(actionOptions); err != nil {
 		return nil, err
 	}
 
 	// wait until the backend repository has been initialized.
-	err = api_util.WaitForBackendRepository(actionOptions)
-	if err != nil {
+	if err := api_util.WaitForBackendRepository(actionOptions); err != nil {
 		return nil, err
 	}
 
@@ -197,36 +200,120 @@ func (opt *vaultOptions) backupVault(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
-	session := opt.newSessionWrapper(VaultDumpCMD)
+	parameters := vaultconfig.VaultServerConfiguration{}
+	if appBinding.Spec.Parameters != nil {
+		if err = json.Unmarshal(appBinding.Spec.Parameters.Raw, &parameters); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw: %w", err)
+		}
+	}
 
-	err = session.setDatabaseCredentials(opt.kubeClient, appBinding)
+	// update this while adding support for more backend options for backup (consul, s3, etc.)
+	if parameters.Backend != VaultStorageBackendRaft {
+		return nil, fmt.Errorf("backend must be Raft for backup snapshots")
+	}
+
+	if err = clearDir(opt.interimDataDir); err != nil {
+		return nil, err
+	}
+
+	session := opt.newSessionWrapper(VaultCMD)
+
+	vaultClient, err := newVaultClient(appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	err = session.setDatabaseConnectionParameters(appBinding)
-	if err != nil {
+	if err := session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir); err != nil {
 		return nil, err
 	}
 
-	err = session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir)
-	if err != nil {
+	if err := session.waitForVaultReady(vaultClient, opt.waitTimeout); err != nil {
 		return nil, err
 	}
 
-	err = session.waitForDBReady(opt.waitTimeout)
-	if err != nil {
+	if err := session.setVaultToken(opt.kubeClient, appBinding, parameters.BackupTokenSecretRef); err != nil {
 		return nil, err
 	}
 
-	session.setUserArgs(opt.vaultArgs)
+	if err := session.setVaultConnectionParameters(vaultClient, appBinding); err != nil {
+		return nil, err
+	}
 
-	// add backup command in the pipeline
-	opt.backupOptions.StdinPipeCommands = append(opt.backupOptions.StdinPipeCommands, *session.cmd)
-	resticWrapper, err := restic.NewResticWrapperFromShell(opt.setupOptions, session.sh)
+	klog.Infof("Trying to backup for VaultServer %s/%s\n", appBinding.Namespace, appBinding.Name)
+
+	if err := opt.saveVaultSnapshot(session); err != nil {
+		return nil, err
+	}
+
+	if err := opt.writeVaultTokenKeys(appBinding, parameters); err != nil {
+		return nil, err
+	}
+
+	opt.backupOptions.BackupPaths = []string{opt.interimDataDir}
+	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	return resticWrapper.RunBackup(opt.backupOptions, targetRef)
+}
+
+func (opt *vaultOptions) saveVaultSnapshot(session *sessionWrapper) error {
+	klog.Infoln("Trying to save snapshot")
+	session.cmd.Args = append(session.cmd.Args, "operator", "raft", "snapshot", "save", filepath.Join(opt.interimDataDir, VaultSnapshotFile))
+
+	session.sh.ShowCMD = false
+	session.setUserArgs(opt.vaultArgs)
+	session.sh.Command(VaultCMD, session.cmd.Args...)
+
+	if err := session.sh.Run(); err != nil {
+		return err
+	}
+
+	klog.Infoln("snapshot saved successfully")
+	return nil
+}
+
+func (opt *vaultOptions) writeVaultTokenKeys(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) error {
+	if params.Unsealer == nil {
+		return fmt.Errorf("unsealer spec is nil")
+	}
+
+	klog.Infoln("Trying to get, write unseal keys & root token")
+	// for backup:
+	// i. Get the unseal key & root token from store based on the unseal mode
+	// ii. write them into the interim directory which will be backed up
+	st, err := store.NewStore(opt.kubeClient, appBinding, params.Unsealer)
+	if err != nil {
+		return err
+	}
+
+	var keys []string
+	keys = append(keys, opt.tokenName(opt.keyPrefix))
+	for i := 0; i < int(params.Unsealer.SecretShares); i++ {
+		keys = append(keys, opt.unsealKeyName(opt.keyPrefix, i))
+	}
+
+	for _, key := range keys {
+		value, err := st.Get(key)
+		if err != nil {
+			return fmt.Errorf("failed to get key %s. Reason: %w", key, err)
+		}
+
+		if err := opt.write(key, value); err != nil {
+			return fmt.Errorf("failed to write key %s. Reason: %w", key, err)
+		}
+	}
+
+	klog.Infoln("Successfully stored unseal keys & root token")
+	return nil
+}
+
+func (opt *vaultOptions) write(key, value string) error {
+	byteStreams, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filepath.Join(opt.interimDataDir, key), byteStreams, 0o644)
 }

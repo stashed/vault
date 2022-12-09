@@ -27,7 +27,9 @@ import (
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
 	"stash.appscode.dev/apimachinery/pkg/restic"
 
+	"github.com/hashicorp/vault/api"
 	shell "gomodules.xyz/go-sh"
+	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -39,12 +41,14 @@ import (
 )
 
 const (
-	VaultUser        = "username"
-	VaultPassword    = "password"
-	VaultDumpFile    = "dumpfile.sql"
-	VaultDumpCMD     = "vaultdump"
-	VaultRestoreCMD  = "vault"
-	EnvVaultPassword = "Vault_PWD"
+	VaultToken            = "token"
+	VaultSnapshotFile     = "backup.snap"
+	VaultCMD              = "vault"
+	VaultTLSRootCA        = "ca.crt"
+	EnvVaultAddress       = "VAULT_ADDR"
+	EnvVaultToken         = "VAULT_TOKEN"
+	EnvVaultCACert        = "VAULT_CACERT"
+	EnvVaultSkipVerifyTLS = "VAULT_SKIP_VERIFY"
 )
 
 type vaultOptions struct {
@@ -61,11 +65,23 @@ type vaultOptions struct {
 	outputDir           string
 	storageSecret       kmapi.ObjectReference
 
-	setupOptions  restic.SetupOptions
-	backupOptions restic.BackupOptions
-	dumpOptions   restic.DumpOptions
-	config        *restclient.Config
+	setupOptions   restic.SetupOptions
+	backupOptions  restic.BackupOptions
+	restoreOptions restic.RestoreOptions
+	config         *restclient.Config
+
+	interimDataDir string
+
+	// vault related flags
+	force bool
+
+	keyPrefix    string
+	oldKeyPrefix string
 }
+
+const (
+	VaultStorageBackendRaft = "raft"
+)
 
 type sessionWrapper struct {
 	sh  *shell.Session
@@ -81,37 +97,37 @@ func (opt *vaultOptions) newSessionWrapper(cmd string) *sessionWrapper {
 	}
 }
 
-func (session *sessionWrapper) setDatabaseCredentials(kubeClient kubernetes.Interface, appBinding *appcatalog.AppBinding) error {
-	appBindingSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
+func (session *sessionWrapper) setVaultToken(kubeClient kubernetes.Interface, appBinding *appcatalog.AppBinding, backupTokenRef *core.LocalObjectReference) error {
+	var secretName string
+	if backupTokenRef != nil {
+		secretName = backupTokenRef.Name
+	}
+
+	tokenSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	err = appBinding.TransformSecret(kubeClient, appBindingSecret.Data)
-	if err != nil {
+	if err := appBinding.TransformSecret(kubeClient, tokenSecret.Data); err != nil {
 		return err
 	}
 
-	session.cmd.Args = append(session.cmd.Args, "-u", string(appBindingSecret.Data[VaultUser]))
-	session.sh.SetEnv(EnvVaultPassword, string(appBindingSecret.Data[VaultPassword]))
+	session.sh.SetEnv(EnvVaultToken, string(tokenSecret.Data[VaultToken]))
+
 	return nil
 }
 
-func (session *sessionWrapper) setDatabaseConnectionParameters(appBinding *appcatalog.AppBinding) error {
-	hostname, err := appBinding.Hostname()
-	if err != nil {
-		return err
-	}
-	session.cmd.Args = append(session.cmd.Args, "-h", hostname)
+func (session *sessionWrapper) setVaultConnectionParameters(vc *api.Client, appBinding *appcatalog.AppBinding) error {
+	// use leader pod addr to take the snapshot
+	// known issue: https://github.com/hashicorp/vault/issues/15258
 
-	port, err := appBinding.Port()
+	leaderAddr, err := getLeaderAddress(vc, appBinding)
 	if err != nil {
 		return err
 	}
-	// if port is specified, append port in the arguments
-	if port != 0 {
-		session.cmd.Args = append(session.cmd.Args, fmt.Sprintf("--port=%d", port))
-	}
+
+	session.sh.SetEnv(EnvVaultAddress, leaderAddr)
+
 	return nil
 }
 
@@ -122,39 +138,103 @@ func (session *sessionWrapper) setUserArgs(args string) {
 }
 
 func (session *sessionWrapper) setTLSParameters(appBinding *appcatalog.AppBinding, scratchDir string) error {
-	// if ssl enabled, add ca.crt in the arguments
 	if appBinding.Spec.ClientConfig.CABundle != nil {
 		if err := os.WriteFile(filepath.Join(scratchDir, VaultTLSRootCA), appBinding.Spec.ClientConfig.CABundle, os.ModePerm); err != nil {
 			return err
 		}
-		tlsCreds := []interface{}{
-			fmt.Sprintf("--ssl-ca=%v", filepath.Join(scratchDir, VaultTLSRootCA)),
-		}
-		session.cmd.Args = append(session.cmd.Args, tlsCreds)
+
+		session.sh.SetEnv(EnvVaultCACert, filepath.Join(scratchDir, VaultTLSRootCA))
 	}
 	return nil
 }
 
-func (session sessionWrapper) waitForDBReady(waitTimeout int32) error {
-	klog.Infoln("Waiting for the database to be ready....")
-
-	sh := shell.NewSession()
-	for k, v := range session.sh.Env {
-		sh.SetEnv(k, v)
-	}
-
-	// Execute "SELECT 1" query to the database. It should return an error when vaultd is not ready.
-	args := append(session.cmd.Args, "-e", "SELECT 1;")
-
-	// don't show the output of the query
-	sh.Stdout = nil
+func (session sessionWrapper) waitForVaultReady(vc *api.Client, waitTimeout int32) error {
+	klog.Infoln("Waiting for the vault to be ready....")
 
 	return wait.PollImmediate(5*time.Second, time.Duration(waitTimeout)*time.Second, func() (done bool, err error) {
-		if err := sh.Command("vault", args...).Run(); err == nil {
-			klog.Infoln("Database is accepting connection....")
-			return true, nil
+		resp, err := vc.Sys().Health()
+		if err != nil {
+			klog.Infof("Unable to connect with the VaultServer. Reason: %v.\nRetrying after 5 seconds....", err)
+			return false, nil
 		}
-		klog.Infof("Unable to connect with the database. Reason: %v.\nRetrying after 5 seconds....", err)
-		return false, nil
+
+		if resp == nil {
+			klog.Infof("Unable to connect with the VaultServer. Reason: Empty Health response")
+			return false, nil
+		}
+
+		if resp.Sealed {
+			klog.Infof("Unable to connect with the VaultServer. Reason: VaultServer is Sealed")
+			return false, nil
+		}
+
+		klog.Infoln("VaultServer is Unsealed & Accepting Connection")
+		return true, nil
 	})
+}
+
+func clearDir(dir string) error {
+	if err := os.RemoveAll(dir); err != nil {
+		return fmt.Errorf("unable to clean datadir: %v. Reason: %v", dir, err)
+	}
+	return os.MkdirAll(dir, os.ModePerm)
+}
+
+func newVaultClient(appBinding *appcatalog.AppBinding) (*api.Client, error) {
+	url, err := appBinding.URL()
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := api.DefaultConfig()
+	cfg.Address = url
+
+	tlsConfig := &api.TLSConfig{
+		Insecure: true,
+	}
+
+	if err = cfg.ConfigureTLS(tlsConfig); err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(cfg)
+}
+
+func getLeaderAddress(vc *api.Client, appBinding *appcatalog.AppBinding) (string, error) {
+	port, err := appBinding.Port()
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := vc.Sys().Leader()
+	if err != nil {
+		return "", err
+	}
+
+	addr := resp.LeaderClusterAddress
+	if len(addr) == 0 {
+		return "", fmt.Errorf("leader address is empty")
+	}
+
+	addr = addr[strings.LastIndex(addr, "/")+1 : strings.LastIndex(addr, ":")]
+
+	leaderAddr := fmt.Sprintf("%s://%s.%s.svc:%d", appBinding.Spec.ClientConfig.Service.Scheme, addr, appBinding.Namespace, port)
+
+	return leaderAddr, nil
+}
+
+func (opt *vaultOptions) unsealKeyName(keyPrefix string, id int) string {
+	if len(keyPrefix) == 0 {
+		return fmt.Sprintf("unseal-key-%d", id)
+	}
+
+	return fmt.Sprintf("%s-unseal-key-%d", keyPrefix, id)
+}
+
+func (opt *vaultOptions) tokenName(keyPrefix string) string {
+	if len(keyPrefix) == 0 {
+		return "root-token"
+	}
+
+	return fmt.Sprintf("%s-root-token", keyPrefix)
 }
