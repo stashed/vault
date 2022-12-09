@@ -30,7 +30,6 @@ import (
 	kmsv1 "cloud.google.com/go/kms/apiv1"
 	"cloud.google.com/go/kms/apiv1/kmspb"
 	"cloud.google.com/go/storage"
-	"github.com/pkg/errors"
 	"google.golang.org/api/cloudkms/v1"
 	"google.golang.org/api/option"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -45,23 +44,23 @@ const (
 	GoogleApplicationCred = "GOOGLE_APPLICATION_CREDENTIALS"
 )
 
-type GcsStore struct {
+type gcsStore struct {
 	gcsSpec    *vaultapi.GoogleKmsGcsSpec
 	client     *storage.Client
 	appBinding *appcatalog.AppBinding
 }
 
-func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, gcsSpec *vaultapi.GoogleKmsGcsSpec) (*GcsStore, error) {
+func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, gcsSpec *vaultapi.GoogleKmsGcsSpec) (*gcsStore, error) {
 	if appBinding == nil {
-		return nil, errors.New("appBinding is nil")
+		return nil, fmt.Errorf("appBinding is nil")
 	}
 
 	if gcsSpec == nil {
-		return nil, errors.New("gcsSpec is nil")
+		return nil, fmt.Errorf("gcsSpec is nil")
 	}
 
 	if kc == nil {
-		return nil, errors.New("kubeClient is nil")
+		return nil, fmt.Errorf("kubeClient is nil")
 	}
 
 	var cred string
@@ -75,7 +74,7 @@ func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, gcsSpec *va
 	}
 
 	if _, ok := secret.Data[ServiceAccountJSON]; !ok {
-		return nil, errors.Errorf("%s not found in secret", ServiceAccountJSON)
+		return nil, fmt.Errorf("%s not found in secret", ServiceAccountJSON)
 	}
 
 	path := filepath.Join("/tmp", fmt.Sprintf("google-sa-cred-%s", randomString(6)))
@@ -97,14 +96,14 @@ func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, gcsSpec *va
 		return nil, err
 	}
 
-	return &GcsStore{
+	return &gcsStore{
 		gcsSpec:    gcsSpec,
 		client:     client,
 		appBinding: appBinding,
 	}, nil
 }
 
-func (store *GcsStore) Get(key string) (string, error) {
+func (store *gcsStore) Get(key string) (string, error) {
 	rc, err := store.client.Bucket(store.gcsSpec.Bucket).Object(key).NewReader(context.TODO())
 	if err != nil {
 		return "", err
@@ -128,10 +127,10 @@ func (store *GcsStore) Get(key string) (string, error) {
 	return decryptedToken, nil
 }
 
-func (store *GcsStore) Set(key, value string) error {
+func (store *gcsStore) Set(key, value string) error {
 	kmsService, err := cloudkms.NewService(context.TODO(), option.WithScopes(cloudkms.CloudPlatformScope))
 	if err != nil {
-		return errors.Errorf("error creating google kms service client: %s", err.Error())
+		return fmt.Errorf("error creating google kms service client: %w", err)
 	}
 
 	name := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
@@ -142,7 +141,7 @@ func (store *GcsStore) Set(key, value string) error {
 		Plaintext: base64.StdEncoding.EncodeToString([]byte(value)),
 	}).Do()
 	if err != nil {
-		return errors.Errorf("error encrypting data: %s", err.Error())
+		return fmt.Errorf("error encrypting data: %w", err)
 	}
 
 	cipherText, err := base64.StdEncoding.DecodeString(resp.Ciphertext)
@@ -152,7 +151,7 @@ func (store *GcsStore) Set(key, value string) error {
 
 	w := store.client.Bucket(store.gcsSpec.Bucket).Object(key).NewWriter(context.TODO())
 	if _, err := w.Write(cipherText); err != nil {
-		return fmt.Errorf("error writing key '%s' to gcs bucket '%s'", key, store.gcsSpec.Bucket)
+		return fmt.Errorf("error writing key %s to gcs bucket %s: %w", key, store.gcsSpec.Bucket, err)
 	}
 
 	return w.Close()
@@ -161,7 +160,7 @@ func (store *GcsStore) Set(key, value string) error {
 func decryptSymmetric(name string, ciphertext []byte) (string, error) {
 	client, err := kmsv1.NewKeyManagementClient(context.TODO())
 	if err != nil {
-		return "", errors.Errorf("failed to create kms client: %v", err)
+		return "", fmt.Errorf("failed to create kms client: %w", err)
 	}
 	defer client.Close()
 
@@ -179,11 +178,11 @@ func decryptSymmetric(name string, ciphertext []byte) (string, error) {
 
 	result, err := client.Decrypt(context.TODO(), req)
 	if err != nil {
-		return "", errors.Errorf("failed to decrypt ciphertext with %s", err.Error())
+		return "", fmt.Errorf("failed to decrypt ciphertext: %w", err)
 	}
 
 	if int64(crc32c(result.Plaintext)) != result.PlaintextCrc32C.Value {
-		return "", errors.Errorf("decrypt response corrupted in-transit")
+		return "", fmt.Errorf("decrypt response corrupted in-transit")
 	}
 
 	return string(result.Plaintext), nil

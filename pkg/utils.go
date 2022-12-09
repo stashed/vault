@@ -18,7 +18,6 @@ package pkg
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,7 +51,7 @@ const (
 	EnvVaultSkipVerifyTLS = "VAULT_SKIP_VERIFY"
 )
 
-type VaultOptions struct {
+type vaultOptions struct {
 	kubeClient    kubernetes.Interface
 	stashClient   stash.Interface
 	catalogClient appcatalog_cs.Interface
@@ -84,16 +83,12 @@ const (
 	VaultStorageBackendRaft = "raft"
 )
 
-type BackupToken struct {
-	VaultBackupToken *core.LocalObjectReference `json:"vaultBackupToken,omitempty"`
-}
-
 type sessionWrapper struct {
 	sh  *shell.Session
 	cmd *restic.Command
 }
 
-func (opt *VaultOptions) newSessionWrapper(cmd string) *sessionWrapper {
+func (opt *vaultOptions) newSessionWrapper(cmd string) *sessionWrapper {
 	return &sessionWrapper{
 		sh: shell.NewSession(),
 		cmd: &restic.Command{
@@ -218,7 +213,7 @@ func getLeaderAddress(vc *api.Client, appBinding *appcatalog.AppBinding) (string
 
 	addr := resp.LeaderClusterAddress
 	if len(addr) == 0 {
-		return "", errors.New("leader address is empty")
+		return "", fmt.Errorf("leader address is empty")
 	}
 
 	addr = addr[strings.LastIndex(addr, "/")+1 : strings.LastIndex(addr, ":")]
@@ -228,7 +223,7 @@ func getLeaderAddress(vc *api.Client, appBinding *appcatalog.AppBinding) (string
 	return leaderAddr, nil
 }
 
-func (opt *VaultOptions) unsealKeyName(keyPrefix string, id int) string {
+func (opt *vaultOptions) unsealKeyName(keyPrefix string, id int) string {
 	if len(keyPrefix) == 0 {
 		return fmt.Sprintf("unseal-key-%d", id)
 	}
@@ -236,7 +231,7 @@ func (opt *VaultOptions) unsealKeyName(keyPrefix string, id int) string {
 	return fmt.Sprintf("%s-unseal-key-%d", keyPrefix, id)
 }
 
-func (opt *VaultOptions) tokenName(keyPrefix string) string {
+func (opt *vaultOptions) tokenName(keyPrefix string) string {
 	if len(keyPrefix) == 0 {
 		return "root-token"
 	}

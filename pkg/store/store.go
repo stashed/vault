@@ -17,12 +17,13 @@ limitations under the License.
 package store
 
 import (
+	"fmt"
+
 	"stash.appscode.dev/vault/pkg/store/aws"
 	"stash.appscode.dev/vault/pkg/store/azure"
 	"stash.appscode.dev/vault/pkg/store/gcs"
 	"stash.appscode.dev/vault/pkg/store/k8s"
 
-	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
@@ -30,15 +31,15 @@ import (
 
 func NewStore(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, unsealerSpec *vaultapi.UnsealerSpec) (StoreInterface, error) {
 	if appBinding == nil {
-		return nil, errors.New("appBinding is nil")
+		return nil, fmt.Errorf("appBinding is nil")
 	}
 
 	if unsealerSpec == nil {
-		return nil, errors.New("vault unsealer spec is nil")
+		return nil, fmt.Errorf("vault unsealer spec is nil")
 	}
 
 	if kc == nil {
-		return nil, errors.New("kubeclient is nil")
+		return nil, fmt.Errorf("kubeclient is nil")
 	}
 
 	mode := unsealerSpec.Mode
@@ -54,5 +55,5 @@ func NewStore(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, unseal
 		return k8s.New(kc, appBinding, mode.KubernetesSecret)
 	}
 
-	return nil, errors.New("unknown unseal mode")
+	return nil, fmt.Errorf("unknown unseal mode")
 }

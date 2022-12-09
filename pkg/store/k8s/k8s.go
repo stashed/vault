@@ -18,8 +18,8 @@ package k8s
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -28,29 +28,29 @@ import (
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
 
-type K8sStore struct {
+type k8sStore struct {
 	k8sSpec    *vaultapi.KubernetesSecretSpec
 	kc         kubernetes.Interface
 	appBinding *appcatalog.AppBinding
 }
 
-func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, k8sSpec *vaultapi.KubernetesSecretSpec) (*K8sStore, error) {
+func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, k8sSpec *vaultapi.KubernetesSecretSpec) (*k8sStore, error) {
 	if k8sSpec == nil {
-		return nil, errors.New("k8sSpec  is nil")
+		return nil, fmt.Errorf("k8sSpec is nil")
 	}
 
 	if kc == nil {
-		return nil, errors.New("kubeClient is nil")
+		return nil, fmt.Errorf("kubeClient is nil")
 	}
 
-	return &K8sStore{
+	return &k8sStore{
 		k8sSpec:    k8sSpec,
 		kc:         kc,
 		appBinding: appBinding,
 	}, nil
 }
 
-func (store *K8sStore) Get(key string) (string, error) {
+func (store *k8sStore) Get(key string) (string, error) {
 	name := store.k8sSpec.SecretName
 
 	secret, err := store.kc.CoreV1().Secrets(store.appBinding.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -59,13 +59,13 @@ func (store *K8sStore) Get(key string) (string, error) {
 	}
 
 	if _, ok := secret.Data[key]; !ok {
-		return "", errors.Errorf("%s not found in secret %s/%s", key, store.appBinding.Namespace, name)
+		return "", fmt.Errorf("%s not found in secret %s/%s", key, store.appBinding.Namespace, name)
 	}
 
 	return string(secret.Data[key]), nil
 }
 
-func (store *K8sStore) Set(key, value string) error {
+func (store *k8sStore) Set(key, value string) error {
 	secretMeta := metav1.ObjectMeta{
 		Name:      store.k8sSpec.SecretName,
 		Namespace: store.appBinding.Namespace,

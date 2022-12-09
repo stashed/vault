@@ -9,7 +9,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets v0.10.1
 	github.com/aws/aws-sdk-go v1.44.100
 	github.com/hashicorp/vault/api v1.8.2
-	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.5.0
 	go.bytebuilders.dev/license-verifier/kubernetes v0.12.0
 	gomodules.xyz/flags v0.1.3
@@ -111,6 +110,7 @@ require (
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
 	github.com/pkg/browser v0.0.0-20210115035449-ce105d075bb4 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect

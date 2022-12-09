@@ -16,6 +16,7 @@ package pkg
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -23,7 +24,6 @@ import (
 	"stash.appscode.dev/apimachinery/pkg/restic"
 	"stash.appscode.dev/vault/pkg/store"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	license "go.bytebuilders.dev/license-verifier/kubernetes"
 	"gomodules.xyz/flags"
@@ -42,7 +42,7 @@ func NewCmdRestore() *cobra.Command {
 		masterURL      string
 		kubeconfigPath string
 
-		opt = VaultOptions{
+		opt = vaultOptions{
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
 				EnableCache: false,
@@ -147,7 +147,7 @@ func NewCmdRestore() *cobra.Command {
 	return cmd
 }
 
-func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.RestoreOutput, error) {
+func (opt *vaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.RestoreOutput, error) {
 	var err error
 
 	err = license.CheckLicenseEndpoint(opt.config, licenseApiService, SupportedProducts)
@@ -170,7 +170,6 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	// get the vault appbinding which has necessary information about vault & vault backup token
 	appBinding, err := opt.catalogClient.AppcatalogV1alpha1().AppBindings(opt.appBindingNamespace).Get(context.TODO(), opt.appBindingName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -179,45 +178,37 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 	parameters := vaultconfig.VaultServerConfiguration{}
 	if appBinding.Spec.Parameters != nil {
 		if err = json.Unmarshal(appBinding.Spec.Parameters.Raw, &parameters); err != nil {
-			klog.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw. Reason: %v", err)
+			return nil, fmt.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw: %w", err)
 		}
 	}
 
-	// update this while adding support for more backend options for backup (consul, s3, etc.)
 	if parameters.Backend != VaultStorageBackendRaft {
-		return nil, errors.New("Backend must be Raft for backup snapshots")
+		return nil, fmt.Errorf("backend must be Raft for backup snapshots")
 	}
 
-	// clean the interim directory where the snapshot, unseal keys & root token will be stored
 	if err := clearDir(opt.interimDataDir); err != nil {
 		return nil, err
 	}
 
 	session := opt.newSessionWrapper(VaultCMD)
 
-	// create a new vault client to interact with vault
-	// this is needed for running commands like: vault operator raft snapshot save backup.snap or restore backup.snap
 	vaultClient, err := newVaultClient(appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	// if the vault is TLS enabled then set the env variable for vault TLS
 	if err := session.setTLSParameters(appBinding, opt.setupOptions.ScratchDir); err != nil {
 		return nil, err
 	}
 
-	// wait until the vault is ready (vault must be unsealed when ready)
 	if err := session.waitForVaultReady(vaultClient, opt.waitTimeout); err != nil {
 		return nil, err
 	}
 
-	// set the vault token that has the necessary permission to save or restore snapshot
 	if err := session.setVaultToken(opt.kubeClient, appBinding, parameters.BackupTokenSecretRef); err != nil {
 		return nil, err
 	}
 
-	// set the vault connection parameters, essentially the vault leader node address
 	if err := session.setVaultConnectionParameters(vaultClient, appBinding); err != nil {
 		return nil, err
 	}
@@ -236,32 +227,25 @@ func (opt *VaultOptions) restoreVault(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	// restore the vault snapshot from the interim directory running command like: vault operator raft snapshot restore backup.snap
-	// for different vault server using -force flag like: vault operator raft snapshot restore -force backup.snap
 	if err := opt.restoreVaultSnapshot(session); err != nil {
 		return nil, err
 	}
 
-	// if -force is true, we're potentially dealing with restoring snapshot on a different vault server
-	// we must replace the current vault server's unseal keys & root token with the older ones that we saved during snapshot
 	if opt.force {
-		klog.Infoln("Potentially different VaultServer. Trying to migrate old unseal keys & root token.")
-		if err := opt.setVaultTokenKeys(appBinding, parameters); err != nil {
+		if err := opt.migrateVaultTokenKeys(appBinding, parameters); err != nil {
 			return nil, err
 		}
-		klog.Infoln("Successfully migrated old unseal keys & root token")
 	}
 
 	return restoreOutput, nil
 }
 
-func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
+func (opt *vaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 	klog.Infoln("Trying to restore snapshot")
 	session.cmd.Args = append(session.cmd.Args, "operator", "raft", "snapshot", "restore")
 
 	// -force is required for different vault cluster snapshot restoration
 	if opt.force {
-		klog.Infoln("Potentially different VaultServer. Applying -force to restore snapshot")
 		session.cmd.Args = append(session.cmd.Args, "-force")
 	}
 
@@ -279,13 +263,12 @@ func (opt *VaultOptions) restoreVaultSnapshot(session *sessionWrapper) error {
 	return nil
 }
 
-func (opt *VaultOptions) setVaultTokenKeys(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) error {
+func (opt *vaultOptions) migrateVaultTokenKeys(appBinding *appcatalog.AppBinding, params vaultconfig.VaultServerConfiguration) error {
 	if params.Unsealer == nil {
-		return errors.New("unsealer spec is nil")
+		return fmt.Errorf("unsealer spec is nil")
 	}
 
 	klog.Infoln("Trying to read, set unseal keys & root token")
-	// create a new store interface
 	// for restore:
 	// i. read the unseal keys & root token from the interim directory
 	// ii. Set the unseal keys & root token to store based on the unseal mode
@@ -309,20 +292,18 @@ func (opt *VaultOptions) setVaultTokenKeys(appBinding *appcatalog.AppBinding, pa
 	for idx, oldKey := range oldKeys {
 		value, err := opt.read(oldKey)
 		if err != nil {
-			klog.Errorf("failed to read key %s with %s\n", oldKey, err.Error())
-			return err
+			return fmt.Errorf("failed to read key %s. Reason: %w", oldKey, err)
 		}
 
 		if err := st.Set(newKeys[idx], value); err != nil {
-			klog.Errorf("failed to set key %s with %s\n", newKeys[idx], err.Error())
-			return err
+			return fmt.Errorf("failed to set key %s. Reason: %w", newKeys[idx], err)
 		}
 	}
 
 	return nil
 }
 
-func (opt *VaultOptions) read(key string) (string, error) {
+func (opt *vaultOptions) read(key string) (string, error) {
 	byteStreams, err := os.ReadFile(filepath.Join(opt.interimDataDir, key))
 	if err != nil {
 		return "", err

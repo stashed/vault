@@ -19,12 +19,12 @@ package azure
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
-	"github.com/pkg/errors"
 	"gomodules.xyz/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -38,19 +38,19 @@ const (
 	AzureTenantID     = "AZURE_TENANT_ID"
 )
 
-type AzureStore struct {
+type azureStore struct {
 	azureSpec  *vaultapi.AzureKeyVault
 	cred       *azidentity.DefaultAzureCredential
 	appBinding *appcatalog.AppBinding
 }
 
-func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, azureSpec *vaultapi.AzureKeyVault) (*AzureStore, error) {
+func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, azureSpec *vaultapi.AzureKeyVault) (*azureStore, error) {
 	if azureSpec == nil {
-		return nil, errors.New("azureSpec is nil")
+		return nil, fmt.Errorf("azureSpec is nil")
 	}
 
 	if appBinding == nil {
-		return nil, errors.New("appBinding is nil")
+		return nil, fmt.Errorf("appBinding is nil")
 	}
 
 	var cred string
@@ -85,14 +85,14 @@ func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, azureSpec *
 		return nil, err
 	}
 
-	return &AzureStore{
+	return &azureStore{
 		azureSpec:  azureSpec,
 		cred:       azcred,
 		appBinding: appBinding,
 	}, nil
 }
 
-func (store *AzureStore) Get(key string) (string, error) {
+func (store *azureStore) Get(key string) (string, error) {
 	vaultBaseUrl := store.azureSpec.VaultBaseURL
 	client := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
 
@@ -109,7 +109,7 @@ func (store *AzureStore) Get(key string) (string, error) {
 	return string(decoded), nil
 }
 
-func (store *AzureStore) Set(key, value string) error {
+func (store *azureStore) Set(key, value string) error {
 	key = strings.Replace(key, ".", "-", -1)
 
 	vaultBaseUrl := store.azureSpec.VaultBaseURL
@@ -120,7 +120,7 @@ func (store *AzureStore) Set(key, value string) error {
 		ContentType: pointer.StringP("password"),
 	}, nil)
 	if err != nil {
-		return errors.Wrap(err, "unable to set secrets in key vault")
+		return fmt.Errorf("unable to set secrets in key vault: %w", err)
 	}
 
 	return nil

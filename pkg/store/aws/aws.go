@@ -19,13 +19,13 @@ package aws
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
@@ -37,24 +37,24 @@ const (
 	AWSSecretKey = "AWS_SECRET_ACCESS_KEY"
 )
 
-type AwsKmsStore struct {
+type awsKmsStore struct {
 	ssmService *ssm.SSM
 	kmsService *kms.KMS
 	awsSpec    *vaultapi.AwsKmsSsmSpec
 	appBinding *appcatalog.AppBinding
 }
 
-func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, awsSpec *vaultapi.AwsKmsSsmSpec) (*AwsKmsStore, error) {
+func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, awsSpec *vaultapi.AwsKmsSsmSpec) (*awsKmsStore, error) {
 	if appBinding == nil {
-		return nil, errors.New("appBinding is nil")
+		return nil, fmt.Errorf("appBinding is nil")
 	}
 
 	if awsSpec == nil {
-		return nil, errors.New("aws is nil")
+		return nil, fmt.Errorf("aws is nil")
 	}
 
 	if kc == nil {
-		return nil, errors.New("kubeClient is nil")
+		return nil, fmt.Errorf("kubeClient is nil")
 	}
 
 	var cred string
@@ -90,10 +90,10 @@ func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, awsSpec *va
 	},
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create session")
+		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
-	return &AwsKmsStore{
+	return &awsKmsStore{
 		kmsService: kms.New(sess),
 		ssmService: ssm.New(sess),
 		awsSpec:    awsSpec,
@@ -101,7 +101,7 @@ func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, awsSpec *va
 	}, nil
 }
 
-func (store *AwsKmsStore) Get(key string) (string, error) {
+func (store *awsKmsStore) Get(key string) (string, error) {
 	req := &ssm.GetParametersInput{
 		Names: []*string{
 			aws.String(key),
@@ -111,16 +111,16 @@ func (store *AwsKmsStore) Get(key string) (string, error) {
 
 	params, err := store.ssmService.GetParameters(req)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get key from ssm")
+		return "", fmt.Errorf("failed to get key from ssm: %w", err)
 	}
 
 	if len(params.Parameters) == 0 {
-		return "", errors.New("failed to get key from ssm; empty response")
+		return "", fmt.Errorf("failed to get key from ssm: empty response")
 	}
 
 	sDec, err := base64.StdEncoding.DecodeString(*params.Parameters[0].Value)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to base64-decode")
+		return "", fmt.Errorf("failed to base64-decode: %w", err)
 	}
 
 	decryptOutput, err := store.kmsService.Decrypt(&kms.DecryptInput{
@@ -132,13 +132,13 @@ func (store *AwsKmsStore) Get(key string) (string, error) {
 		KeyId:       aws.String(store.awsSpec.KmsKeyID),
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "failed to kms decrypt")
+		return "", fmt.Errorf("failed to kms decrypt: %w", err)
 	}
 
 	return string(decryptOutput.Plaintext), nil
 }
 
-func (store *AwsKmsStore) Set(key, value string) error {
+func (store *awsKmsStore) Set(key, value string) error {
 	out, err := store.kmsService.Encrypt(&kms.EncryptInput{
 		KeyId:     aws.String(store.awsSpec.KmsKeyID),
 		Plaintext: []byte(value),
