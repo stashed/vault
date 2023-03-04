@@ -22,14 +22,13 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"math/rand"
 	"os"
 	"path/filepath"
-	"time"
 
 	kmsv1 "cloud.google.com/go/kms/apiv1"
 	"cloud.google.com/go/kms/apiv1/kmspb"
 	"cloud.google.com/go/storage"
+	passgen "gomodules.xyz/password-generator"
 	"google.golang.org/api/cloudkms/v1"
 	"google.golang.org/api/option"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -77,7 +76,7 @@ func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, gcsSpec *va
 		return nil, fmt.Errorf("%s not found in secret", ServiceAccountJSON)
 	}
 
-	path := filepath.Join("/tmp", fmt.Sprintf("google-sa-cred-%s", randomString(6)))
+	path := filepath.Join("/tmp", fmt.Sprintf("google-sa-cred-%s", passgen.Generate(6)))
 	if err = os.MkdirAll(path, os.ModePerm); err != nil {
 		return nil, err
 	}
@@ -186,14 +185,4 @@ func decryptSymmetric(name string, ciphertext []byte) (string, error) {
 	}
 
 	return string(result.Plaintext), nil
-}
-
-func randomString(n int) string {
-	rand.Seed(time.Now().Unix())
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-	s := make([]rune, n)
-	for i := range s {
-		s[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(s)
 }
