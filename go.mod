@@ -9,25 +9,25 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets v0.10.1
 	github.com/aws/aws-sdk-go v1.44.100
 	github.com/hashicorp/vault/api v1.8.2
-	github.com/spf13/cobra v1.6.0
+	github.com/spf13/cobra v1.7.0
 	go.bytebuilders.dev/license-verifier/kubernetes v0.12.0
 	gomodules.xyz/flags v0.1.3
 	gomodules.xyz/go-sh v0.1.0
 	gomodules.xyz/logs v0.0.6
 	gomodules.xyz/password-generator v0.2.9
 	gomodules.xyz/pointer v0.1.0
-	gomodules.xyz/x v0.0.14
+	gomodules.xyz/x v0.0.15
 	google.golang.org/api v0.103.0
 	google.golang.org/protobuf v1.28.1
 	k8s.io/api v0.25.1
 	k8s.io/apimachinery v0.25.3
 	k8s.io/client-go v0.25.1
 	k8s.io/klog/v2 v2.80.1
-	kmodules.xyz/client-go v0.25.19
-	kmodules.xyz/custom-resources v0.25.1
-	kmodules.xyz/offshoot-api v0.25.0
+	kmodules.xyz/client-go v0.25.23
+	kmodules.xyz/custom-resources v0.25.2
+	kmodules.xyz/offshoot-api v0.25.4
 	kubevault.dev/apimachinery v0.12.0
-	stash.appscode.dev/apimachinery v0.29.0
+	stash.appscode.dev/apimachinery v0.30.0
 )
 
 require (
@@ -45,7 +45,8 @@ require (
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1 // indirect
-	github.com/Masterminds/semver/v3 v3.1.1 // indirect
+	github.com/Masterminds/semver/v3 v3.2.1 // indirect
+	github.com/PuerkitoBio/purell v1.2.0 // indirect
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2 // indirect
 	github.com/armon/go-metrics v0.3.9 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
@@ -55,7 +56,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
-	github.com/fatih/color v1.13.0 // indirect
+	github.com/fatih/color v1.15.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
@@ -92,14 +93,14 @@ require (
 	github.com/hashicorp/vault/sdk v0.6.0 // indirect
 	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
-	github.com/inconshreveable/mousetrap v1.0.1 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.0.0 // indirect
@@ -118,19 +119,19 @@ require (
 	github.com/yudai/gojsondiff v1.0.0 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
 	go.bytebuilders.dev/license-proxyserver v0.0.3 // indirect
-	go.bytebuilders.dev/license-verifier v0.12.1-0.20221113063237-6eb88040dd50 // indirect
+	go.bytebuilders.dev/license-verifier v0.13.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/crypto v0.9.0 // indirect
+	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/term v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/term v0.8.0 // indirect
+	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.1.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gomodules.xyz/clock v0.0.0-20200817085942-06523dba733f // indirect
-	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
+	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
 	gomodules.xyz/mergo v0.3.13 // indirect
 	gomodules.xyz/sets v0.2.1 // indirect
 	gomodules.xyz/wait v0.2.0 // indirect
@@ -148,7 +149,7 @@ require (
 	k8s.io/utils v0.0.0-20220823124924-e9cbc92d1a73 // indirect
 	kmodules.xyz/apiversion v0.2.0 // indirect
 	kmodules.xyz/monitoring-agent-api v0.25.0 // indirect
-	kmodules.xyz/objectstore-api v0.25.1-0.20221104003322-f0289b5b6ca2 // indirect
+	kmodules.xyz/objectstore-api v0.25.1 // indirect
 	kmodules.xyz/prober v0.25.0 // indirect
 	sigs.k8s.io/controller-runtime v0.13.1 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
