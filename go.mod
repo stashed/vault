@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.100
 	github.com/hashicorp/vault/api v1.8.2
 	github.com/spf13/cobra v1.7.0
-	go.bytebuilders.dev/license-verifier/kubernetes v0.12.0
+	go.bytebuilders.dev/license-verifier/kubernetes v0.13.2
 	gomodules.xyz/flags v0.1.3
 	gomodules.xyz/go-sh v0.1.0
 	gomodules.xyz/logs v0.0.6
@@ -29,6 +29,8 @@ require (
 	kubevault.dev/apimachinery v0.12.0
 	stash.appscode.dev/apimachinery v0.30.0
 )
+
+require github.com/cespare/xxhash/v2 v2.2.0 // indirect
 
 require (
 	cloud.google.com/go v0.105.0 // indirect
@@ -119,7 +121,7 @@ require (
 	github.com/yudai/gojsondiff v1.0.0 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
 	go.bytebuilders.dev/license-proxyserver v0.0.3 // indirect
-	go.bytebuilders.dev/license-verifier v0.13.0 // indirect
+	go.bytebuilders.dev/license-verifier v0.13.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
