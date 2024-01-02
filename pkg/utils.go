@@ -151,7 +151,7 @@ func (session *sessionWrapper) setTLSParameters(appBinding *appcatalog.AppBindin
 func (session sessionWrapper) waitForVaultReady(vc *api.Client, waitTimeout int32) error {
 	klog.Infoln("Waiting for the vault to be ready....")
 
-	return wait.PollImmediate(5*time.Second, time.Duration(waitTimeout)*time.Second, func() (done bool, err error) {
+	return wait.PollUntilContextTimeout(context.Background(), 5*time.Second, time.Duration(waitTimeout)*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		resp, err := vc.Sys().Health()
 		if err != nil {
 			klog.Infof("Unable to connect with the VaultServer. Reason: %v.\nRetrying after 5 seconds....", err)
