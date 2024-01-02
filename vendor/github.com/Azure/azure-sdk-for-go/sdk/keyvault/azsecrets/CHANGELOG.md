@@ -1,5 +1,18 @@
 # Release History
 
+## 0.12.0 (2023-04-13)
+
+### Features Added
+* upgraded to api version 7.4
+
+### Breaking Changes
+* This module is now DEPRECATED. The latest supported version of this module is at github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets
+
+## 0.11.0 (2022-11-08)
+
+### Breaking Changes
+* `NewClient` returns an `error`
+
 ## 0.10.1 (2022-09-20)
 
 ### Features Added
