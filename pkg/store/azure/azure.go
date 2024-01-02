@@ -94,7 +94,10 @@ func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, azureSpec *
 
 func (store *azureStore) Get(key string) (string, error) {
 	vaultBaseUrl := store.azureSpec.VaultBaseURL
-	client := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
+	client, err := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
+	if err != nil {
+		return "", err
+	}
 
 	resp, err := client.GetSecret(context.Background(), strings.Replace(key, ".", "-", -1), "", nil)
 	if err != nil {
@@ -113,9 +116,12 @@ func (store *azureStore) Set(key, value string) error {
 	key = strings.Replace(key, ".", "-", -1)
 
 	vaultBaseUrl := store.azureSpec.VaultBaseURL
-	client := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
+	client, err := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
+	if err != nil {
+		return err
+	}
 
-	_, err := client.SetSecret(context.TODO(), key, azsecrets.SetSecretParameters{
+	_, err = client.SetSecret(context.TODO(), key, azsecrets.SetSecretParameters{
 		Value:       pointer.StringP(base64.StdEncoding.EncodeToString([]byte(value))),
 		ContentType: pointer.StringP("password"),
 	}, nil)
