@@ -23,23 +23,12 @@ const envVarSendCertChain = "AZURE_CLIENT_SEND_CERTIFICATE_CHAIN"
 // EnvironmentCredentialOptions contains optional parameters for EnvironmentCredential
 type EnvironmentCredentialOptions struct {
 	azcore.ClientOptions
-
-	// DisableInstanceDiscovery should be set true only by applications authenticating in disconnected clouds, or
-	// private clouds such as Azure Stack. It determines whether the credential requests Azure AD instance metadata
-	// from https://login.microsoft.com before authenticating. Setting this to true will skip this request, making
-	// the application responsible for ensuring the configured authority is valid and trustworthy.
-	DisableInstanceDiscovery bool
-	// additionallyAllowedTenants is used only by NewDefaultAzureCredential() to enable that constructor's explicit
-	// option to override the value of AZURE_ADDITIONALLY_ALLOWED_TENANTS. Applications using EnvironmentCredential
-	// directly should set that variable instead. This field should remain unexported to preserve this credential's
-	// unambiguous "all configuration from environment variables" design.
-	additionallyAllowedTenants []string
 }
 
 // EnvironmentCredential authenticates a service principal with a secret or certificate, or a user with a password, depending
 // on environment variable configuration. It reads configuration from these variables, in the following order:
 //
-// # Service principal with client secret
+// Service principal with client secret
 //
 // AZURE_TENANT_ID: ID of the service principal's tenant. Also called its "directory" ID.
 //
@@ -47,17 +36,15 @@ type EnvironmentCredentialOptions struct {
 //
 // AZURE_CLIENT_SECRET: one of the service principal's client secrets
 //
-// # Service principal with certificate
+// Service principal with certificate
 //
 // AZURE_TENANT_ID: ID of the service principal's tenant. Also called its "directory" ID.
 //
 // AZURE_CLIENT_ID: the service principal's client ID
 //
-// AZURE_CLIENT_CERTIFICATE_PATH: path to a PEM or PKCS12 certificate file including the private key.
+// AZURE_CLIENT_CERTIFICATE_PATH: path to a PEM or PKCS12 certificate file including the unencrypted private key.
 //
-// AZURE_CLIENT_CERTIFICATE_PASSWORD: (optional) password for the certificate file.
-//
-// # User with username and password
+// User with username and password
 //
 // AZURE_TENANT_ID: (optional) tenant to authenticate in. Defaults to "organizations".
 //
@@ -66,12 +53,6 @@ type EnvironmentCredentialOptions struct {
 // AZURE_USERNAME: a username (usually an email address)
 //
 // AZURE_PASSWORD: the user's password
-//
-// # Configuration for multitenant applications
-//
-// To enable multitenant authentication, set AZURE_ADDITIONALLY_ALLOWED_TENANTS with a semicolon delimited list of tenants
-// the credential may request tokens from in addition to the tenant specified by AZURE_TENANT_ID. Set
-// AZURE_ADDITIONALLY_ALLOWED_TENANTS to "*" to enable the credential to request a token from any tenant.
 type EnvironmentCredential struct {
 	cred azcore.TokenCredential
 }
@@ -81,7 +62,7 @@ func NewEnvironmentCredential(options *EnvironmentCredentialOptions) (*Environme
 	if options == nil {
 		options = &EnvironmentCredentialOptions{}
 	}
-	tenantID := os.Getenv(azureTenantID)
+	tenantID := os.Getenv("AZURE_TENANT_ID")
 	if tenantID == "" {
 		return nil, errors.New("missing environment variable AZURE_TENANT_ID")
 	}
@@ -89,45 +70,26 @@ func NewEnvironmentCredential(options *EnvironmentCredentialOptions) (*Environme
 	if clientID == "" {
 		return nil, errors.New("missing environment variable " + azureClientID)
 	}
-	// tenants set by NewDefaultAzureCredential() override the value of AZURE_ADDITIONALLY_ALLOWED_TENANTS
-	additionalTenants := options.additionallyAllowedTenants
-	if len(additionalTenants) == 0 {
-		if tenants := os.Getenv(azureAdditionallyAllowedTenants); tenants != "" {
-			additionalTenants = strings.Split(tenants, ";")
-		}
-	}
-	if clientSecret := os.Getenv(azureClientSecret); clientSecret != "" {
+	if clientSecret := os.Getenv("AZURE_CLIENT_SECRET"); clientSecret != "" {
 		log.Write(EventAuthentication, "EnvironmentCredential will authenticate with ClientSecretCredential")
-		o := &ClientSecretCredentialOptions{
-			AdditionallyAllowedTenants: additionalTenants,
-			ClientOptions:              options.ClientOptions,
-			DisableInstanceDiscovery:   options.DisableInstanceDiscovery,
-		}
+		o := &ClientSecretCredentialOptions{ClientOptions: options.ClientOptions}
 		cred, err := NewClientSecretCredential(tenantID, clientID, clientSecret, o)
 		if err != nil {
 			return nil, err
 		}
 		return &EnvironmentCredential{cred: cred}, nil
 	}
-	if certPath := os.Getenv(azureClientCertificatePath); certPath != "" {
+	if certPath := os.Getenv("AZURE_CLIENT_CERTIFICATE_PATH"); certPath != "" {
 		log.Write(EventAuthentication, "EnvironmentCredential will authenticate with ClientCertificateCredential")
 		certData, err := os.ReadFile(certPath)
 		if err != nil {
 			return nil, fmt.Errorf(`failed to read certificate file "%s": %v`, certPath, err)
 		}
-		var password []byte
-		if v := os.Getenv(azureClientCertificatePassword); v != "" {
-			password = []byte(v)
-		}
-		certs, key, err := ParseCertificates(certData, password)
+		certs, key, err := ParseCertificates(certData, nil)
 		if err != nil {
 			return nil, fmt.Errorf(`failed to load certificate from "%s": %v`, certPath, err)
 		}
-		o := &ClientCertificateCredentialOptions{
-			AdditionallyAllowedTenants: additionalTenants,
-			ClientOptions:              options.ClientOptions,
-			DisableInstanceDiscovery:   options.DisableInstanceDiscovery,
-		}
+		o := &ClientCertificateCredentialOptions{ClientOptions: options.ClientOptions}
 		if v, ok := os.LookupEnv(envVarSendCertChain); ok {
 			o.SendCertificateChain = v == "1" || strings.ToLower(v) == "true"
 		}
@@ -137,14 +99,10 @@ func NewEnvironmentCredential(options *EnvironmentCredentialOptions) (*Environme
 		}
 		return &EnvironmentCredential{cred: cred}, nil
 	}
-	if username := os.Getenv(azureUsername); username != "" {
-		if password := os.Getenv(azurePassword); password != "" {
+	if username := os.Getenv("AZURE_USERNAME"); username != "" {
+		if password := os.Getenv("AZURE_PASSWORD"); password != "" {
 			log.Write(EventAuthentication, "EnvironmentCredential will authenticate with UsernamePasswordCredential")
-			o := &UsernamePasswordCredentialOptions{
-				AdditionallyAllowedTenants: additionalTenants,
-				ClientOptions:              options.ClientOptions,
-				DisableInstanceDiscovery:   options.DisableInstanceDiscovery,
-			}
+			o := &UsernamePasswordCredentialOptions{ClientOptions: options.ClientOptions}
 			cred, err := NewUsernamePasswordCredential(tenantID, clientID, username, password, o)
 			if err != nil {
 				return nil, err
