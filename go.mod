@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.100
 	github.com/hashicorp/vault/api v1.10.0
 	github.com/spf13/cobra v1.8.0
-	go.bytebuilders.dev/license-verifier/kubernetes v0.14.4
+	go.bytebuilders.dev/license-verifier/kubernetes v0.14.6
 	gomodules.xyz/flags v0.1.3
 	gomodules.xyz/go-sh v0.1.0
 	gomodules.xyz/logs v0.0.7
@@ -29,7 +29,7 @@ require (
 	kmodules.xyz/custom-resources v0.30.0
 	kmodules.xyz/offshoot-api v0.30.1
 	kubevault.dev/apimachinery v0.18.3
-	stash.appscode.dev/apimachinery v0.38.1-0.20250114050236-cca8469a4c04
+	stash.appscode.dev/apimachinery v0.39.0
 )
 
 require (
@@ -41,7 +41,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.8.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.1 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
-	github.com/Masterminds/semver/v3 v3.2.1 // indirect
+	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/PuerkitoBio/purell v1.2.1 // indirect
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -117,8 +117,8 @@ require (
 	github.com/yudai/gojsondiff v1.0.0 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
-	go.bytebuilders.dev/license-proxyserver v0.0.19 // indirect
-	go.bytebuilders.dev/license-verifier v0.14.4 // indirect
+	go.bytebuilders.dev/license-proxyserver v0.0.20 // indirect
+	go.bytebuilders.dev/license-verifier v0.14.6 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.46.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
