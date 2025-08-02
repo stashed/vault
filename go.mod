@@ -29,7 +29,7 @@ require (
 	kmodules.xyz/custom-resources v0.30.0
 	kmodules.xyz/offshoot-api v0.30.1
 	kubevault.dev/apimachinery v0.18.3
-	stash.appscode.dev/apimachinery v0.40.1-0.20250731053416-f9825ca2e8f5
+	stash.appscode.dev/apimachinery v0.41.0
 )
 
 require (
