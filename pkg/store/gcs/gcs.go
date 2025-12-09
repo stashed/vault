@@ -34,6 +34,7 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	vaultapi "kubevault.dev/apimachinery/apis/kubevault/v1alpha2"
 )
@@ -107,7 +108,10 @@ func (store *gcsStore) Get(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer rc.Close()
+	err = rc.Close()
+	if err != nil {
+		klog.Errorf("Error closing file: %v", err)
+	}
 
 	body, err := io.ReadAll(rc)
 	if err != nil {
@@ -161,7 +165,11 @@ func decryptSymmetric(name string, ciphertext []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create kms client: %w", err)
 	}
-	defer client.Close()
+
+	err = client.Close()
+	if err != nil {
+		klog.Errorf("Error closing file: %v", err)
+	}
 
 	crc32c := func(data []byte) uint32 {
 		t := crc32.MakeTable(crc32.Castagnoli)

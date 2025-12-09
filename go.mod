@@ -1,8 +1,6 @@
 module stash.appscode.dev/vault
 
-go 1.23.0
-
-toolchain go1.24.4
+go 1.25.5
 
 require (
 	cloud.google.com/go/kms v1.15.5
