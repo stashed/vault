@@ -99,7 +99,7 @@ func (store *azureStore) Get(key string) (string, error) {
 		return "", err
 	}
 
-	resp, err := client.GetSecret(context.Background(), strings.Replace(key, ".", "-", -1), "", nil)
+	resp, err := client.GetSecret(context.Background(), strings.ReplaceAll(key, ".", "-"), "", nil)
 	if err != nil {
 		return "", err
 	}
@@ -113,7 +113,7 @@ func (store *azureStore) Get(key string) (string, error) {
 }
 
 func (store *azureStore) Set(key, value string) error {
-	key = strings.Replace(key, ".", "-", -1)
+	key = strings.ReplaceAll(key, ".", "-")
 
 	vaultBaseUrl := store.azureSpec.VaultBaseURL
 	client, err := azsecrets.NewClient(vaultBaseUrl, store.cred, nil)
