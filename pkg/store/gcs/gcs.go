@@ -108,10 +108,11 @@ func (store *gcsStore) Get(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = rc.Close()
-	if err != nil {
-		klog.Errorf("Error closing file: %v", err)
-	}
+	defer func() {
+		if err := rc.Close(); err != nil {
+			klog.Errorf("Error closing file: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(rc)
 	if err != nil {
@@ -166,10 +167,11 @@ func decryptSymmetric(name string, ciphertext []byte) (string, error) {
 		return "", fmt.Errorf("failed to create kms client: %w", err)
 	}
 
-	err = client.Close()
-	if err != nil {
-		klog.Errorf("Error closing file: %v", err)
-	}
+	defer func() {
+		if err := client.Close(); err != nil {
+			klog.Errorf("Error closing file: %v", err)
+		}
+	}()
 
 	crc32c := func(data []byte) uint32 {
 		t := crc32.MakeTable(crc32.Castagnoli)
