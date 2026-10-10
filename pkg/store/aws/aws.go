@@ -81,13 +81,14 @@ func New(kc kubernetes.Interface, appBinding *appcatalog.AppBinding, awsSpec *va
 		}
 	}
 
-	sess, err := session.NewSession(&aws.Config{
-		CredentialsChainVerboseErrors: func() *bool {
-			f := true
-			return &f
-		}(),
-		Region: aws.String(awsSpec.Region),
-	},
+	sess, err := session.NewSession(
+		&aws.Config{
+			CredentialsChainVerboseErrors: func() *bool {
+				f := true
+				return &f
+			}(),
+			Region: aws.String(awsSpec.Region),
+		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)
